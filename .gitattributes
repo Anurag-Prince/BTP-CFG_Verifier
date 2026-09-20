@@ -1,0 +1,7 @@
+# Keep LF line endings everywhere: the repo lives on Windows but is used from WSL/Linux,
+# and shell scripts with CRLF endings fail with "bad interpreter".
+* text=auto eol=lf
+*.sh text eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.pdf binary
