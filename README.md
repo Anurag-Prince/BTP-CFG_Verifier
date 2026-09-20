@@ -17,7 +17,8 @@ has already produced.
 | **Part 0**: project understanding and design | Done (draft v0.1). See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | Open requirements | Listed in [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md), each marked **TO CONFIRM WITH PROFESSOR** |
 | **Part 1**: development environment, C → LLVM IR checkpoint | Done. See below and [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md) |
-| Part 2+ | Not started. Proposed roadmap in ARCHITECTURE §12 |
+| **Part 2**: C/HLL control-flow fundamentals + regression programs | Done. See [`docs/CONTROL_FLOW_FUNDAMENTALS.md`](docs/CONTROL_FLOW_FUNDAMENTALS.md) and [`regression/`](regression) |
+| Later parts | Not started. Roadmap in ARCHITECTURE §12 |
 
 > The target assembly architecture is **not yet decided** (TO CONFIRM WITH PROFESSOR). Nothing in this repo assumes
 > x86-64. The host's default target triple is used only to generate IR for the Part 1 smoke test.
@@ -55,26 +56,38 @@ bash scripts/checkpoint_part1.sh     # or: make checkpoint
 It ends with `CHECKPOINT PART 1 PASSED: C -> LLVM IR works on this machine.` To see a CFG, open
 `build\llvm_cfg\classify.svg` in a browser from Windows, or run `explorer.exe build/llvm_cfg` from WSL.
 
+### 5. Run the Part 2 check
+```bash
+bash scripts/check_part2.sh          # or: make regression
+```
+This checks the hand-derived expected CFG of every regression function against LLVM's own CFG. It ends with
+`PART 2 CHECK PASSED`. The study notes with all expected CFG diagrams are in `docs/CONTROL_FLOW_FUNDAMENTALS.md`.
+
 ---
 
-## Commands (Part 1)
+## Commands
 
 | Command | What it does |
 |---|---|
 | `cfgverify env` | Prints every tool and package version and records them in `build/toolchain.json` |
 | `cfgverify emit-ir FILE.c [-o OUT.ll] [--target TRIPLE]` | C → LLVM IR with the project's canonical flags (`-S -emit-llvm -O0 -fno-discard-value-names`) |
 | `cfgverify llvm-cfg FILE.ll [-o DIR]` | LLVM's own per-function CFG (`opt -passes=dot-cfg`) → DOT + SVG + a networkx summary |
-| `make test` / `pytest` | Environment and C → IR tests |
+| `cfgverify expected-cfgs [--check]` | Part 2: redraws `docs/cfg/*.svg` from `regression/expected/*.toml` and refreshes the generated parts of the study doc |
+| `make test` / `pytest` | All tests: environment, C → IR, and Part 2 regression CFGs |
 
 `python -m cfgverify ...` works the same way as `cfgverify ...`.
 
 ## Repository layout
 
 ```
-docs/              ARCHITECTURE.md (Part 0), OPEN_QUESTIONS.md (for the professor), ENVIRONMENT.md (Part 1)
-scripts/           setup_wsl.sh, checkpoint_part1.sh
+docs/              ARCHITECTURE.md (Part 0), OPEN_QUESTIONS.md (for the professor), ENVIRONMENT.md (Part 1),
+                   CONTROL_FLOW_FUNDAMENTALS.md + cfg/*.svg (Part 2)
+scripts/           setup_wsl.sh, checkpoint_part1.sh, check_part2.sh
 examples/c/        hello_cfg.c (smoke-test program)
+regression/        c/*.c regression programs + expected/*.toml expected CFGs (Part 2)
 src/cfgverify/     the package; each module's docstring states its responsibility and status
+  graph_utils.py   dominators, back edges, natural loops (Part 2)
+  expected.py      load, draw and document expected CFGs (Part 2)
   hll/             C → IR → HLL CFG        (frontend.py and llvm_view.py are implemented; others are stubs)
   asm/             assembly → ASM CFG      (stubs; blocked until the ISA is confirmed)
   normalize/ match/ report/ explain/      (stubs)
@@ -84,7 +97,7 @@ build/             generated output (git-ignored)
 
 ## Git workflow (proposal)
 - `main` always passes `make checkpoint` and `make test`.
-- Do each part on a branch (`part-2-hll-cfg`, …) and merge it when that part's checkpoint passes. Tag it, for example
+- Do each part on a branch (`part-3`, …) and merge it when that part's checkpoint passes. Tag it, for example
   `git tag part1-checkpoint`.
 - To publish on GitHub, create an **empty private** repository, then run
   `git remote add origin <url> && git push -u origin main`.

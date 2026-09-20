@@ -1,0 +1,110 @@
+# Expected CFG (hand-derived) for regression/c/continue.c. Block names are the ones Clang -O0 generates.
+# Checked against LLVM (opt -passes=dot-cfg) by tests/test_regression_cfgs.py. Format: src/cfgverify/expected.py
+program = "continue.c"
+construct = "continue"
+
+[[function]]
+name = "sum_odd"
+decisions = 2
+exits = ["for.end"]
+back_edges = [["for.inc", "for.cond"]]
+loops = [{ header = "for.cond", depth = 1, body = ["for.cond", "for.body", "if.then", "if.end", "for.inc"] }]
+edges = [
+  ["entry",    "for.cond", "U"],
+  ["for.cond", "for.body", "T"],
+  ["for.cond", "for.end",  "F", "leave the loop"],
+  ["for.body", "if.then",  "T"],
+  ["for.body", "if.end",   "F"],
+  ["if.then",  "for.inc",  "U", "continue: go to the step"],
+  ["if.end",   "for.inc",  "U"],
+  ["for.inc",  "for.cond", "U"],
+]
+
+[[function.block]]
+name = "entry"
+lines = [12, 13]
+code = "sum = 0;  int i = 1"
+
+[[function.block]]
+name = "for.cond"
+lines = [13]
+code = "i <= n"
+cond = "i <= n"
+ir = "icmp sle"
+
+[[function.block]]
+name = "for.body"
+lines = [14]
+code = "if (i % 2 == 0)"
+cond = "i % 2 == 0"
+ir = "icmp eq"
+
+[[function.block]]
+name = "if.then"
+lines = [15]
+code = "continue;"
+
+[[function.block]]
+name = "if.end"
+lines = [16]
+code = "sum += i;"
+
+[[function.block]]
+name = "for.inc"
+lines = [13]
+code = "i++   (step)"
+
+[[function.block]]
+name = "for.end"
+lines = [18]
+code = "return sum;"
+
+[[function]]
+name = "count_nonmultiples"
+decisions = 2
+exits = ["while.end"]
+back_edges = [["if.end", "while.cond"], ["if.then", "while.cond"]]
+loops = [{ header = "while.cond", depth = 1, body = ["while.cond", "while.body", "if.then", "if.end"] }]
+edges = [
+  ["entry",      "while.cond", "U"],
+  ["while.cond", "while.body", "T"],
+  ["while.cond", "while.end",  "F", "leave the loop"],
+  ["while.body", "if.then",    "T"],
+  ["while.body", "if.end",     "F"],
+  ["if.then",    "while.cond", "U", "continue: straight back to the condition"],
+  ["if.end",     "while.cond", "U"],
+]
+
+[[function.block]]
+name = "entry"
+lines = [23, 24]
+code = "count = 0;  i = 0;"
+
+[[function.block]]
+name = "while.cond"
+lines = [25]
+code = "while (i < n)"
+cond = "i < n"
+ir = "icmp slt"
+
+[[function.block]]
+name = "while.body"
+lines = [26, 27]
+code = "i++;  if (i % k == 0)"
+cond = "i % k == 0"
+ir = "icmp eq"
+
+[[function.block]]
+name = "if.then"
+lines = [28]
+code = "continue;"
+
+[[function.block]]
+name = "if.end"
+lines = [29]
+code = "count++;"
+
+[[function.block]]
+name = "while.end"
+lines = [31]
+code = "return count;"

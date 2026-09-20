@@ -1,0 +1,28 @@
+# Expected CFG (hand-derived) for regression/c/sequence.c. Block names are the ones Clang -O0 generates.
+# Checked against LLVM (opt -passes=dot-cfg) by tests/test_regression_cfgs.py. Format: src/cfgverify/expected.py
+program = "sequence.c"
+construct = "sequential statements"
+
+[[function]]
+name = "square"
+decisions = 0
+exits = ["entry"]
+back_edges = []
+edges = []
+
+[[function.block]]
+name = "entry"
+lines = [9]
+code = "return x * x;"
+
+[[function]]
+name = "sequence"
+decisions = 0
+exits = ["entry"]
+back_edges = []
+edges = []
+
+[[function.block]]
+name = "entry"
+lines = [13, 14, 15, 16]
+code = "sum = a + b;  diff = a - b;  result = square(sum) - square(diff);  return result;"

@@ -5,6 +5,10 @@ Part 1 commands
     emit-ir    C -> LLVM IR with the project's canonical flags
     llvm-cfg   LLVM's own CFG for each function -> DOT + SVG + networkx summary (smoke test / future oracle)
 
+Part 2 command
+    expected-cfgs   draw the expected CFGs of the regression programs and refresh the generated parts of
+                    docs/CONTROL_FLOW_FUNDAMENTALS.md (--check: only report whether the doc is up to date)
+
 Later parts add `verify <file.c> <file.s>` (pipeline.py). It is not available yet.
 """
 
@@ -87,6 +91,28 @@ def _cmd_llvm_cfg(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_expected_cfgs(args: argparse.Namespace) -> int:
+    from cfgverify import expected
+
+    programs = expected.load_all(args.regression)
+    doc = Path(args.doc)
+    old = doc.read_text()
+    new = expected.refresh_doc(old, programs)
+    if args.check:
+        print("up to date" if new == old else f"{doc} is out of date: run `cfgverify expected-cfgs`")
+        return 0 if new == old else 1
+    svg_dir = Path(args.svg_dir)
+    count = 0
+    for prog in programs:
+        for fn in prog.functions:
+            expected.render_svg(fn, svg_dir / expected.svg_name(fn))
+            count += 1
+    if new != old:
+        doc.write_text(new)
+    print(f"{count} expected CFGs drawn in {svg_dir}/; {doc} {'updated' if new != old else 'already up to date'}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="cfgverify", description=__doc__.splitlines()[0])
     p.add_argument("--version", action="version", version=f"cfgverify {__version__}")
@@ -107,6 +133,13 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("-o", "--output", help="output directory (default: build/llvm_cfg)")
     c.add_argument("--no-svg", action="store_true", help="skip SVG rendering")
     c.set_defaults(func=_cmd_llvm_cfg)
+
+    x = sub.add_parser("expected-cfgs", help="draw the regression programs' expected CFGs and refresh the Part 2 doc")
+    x.add_argument("--regression", default="regression", help="regression directory (default: regression)")
+    x.add_argument("--svg-dir", default="docs/cfg", help="where to write the SVGs (default: docs/cfg)")
+    x.add_argument("--doc", default="docs/CONTROL_FLOW_FUNDAMENTALS.md", help="study document to refresh")
+    x.add_argument("--check", action="store_true", help="only check that the document is up to date")
+    x.set_defaults(func=_cmd_expected_cfgs)
     return p
 
 

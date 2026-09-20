@@ -1,0 +1,93 @@
+# Expected CFG (hand-derived) for regression/c/if_else.c. Block names are the ones Clang -O0 generates.
+# Checked against LLVM (opt -passes=dot-cfg) by tests/test_regression_cfgs.py. Format: src/cfgverify/expected.py
+program = "if_else.c"
+construct = "if-else; else-if chain"
+
+[[function]]
+name = "max2"
+decisions = 1
+exits = ["if.end"]
+back_edges = []
+edges = [
+  ["entry",   "if.then", "T"],
+  ["entry",   "if.else", "F"],
+  ["if.then", "if.end",  "U"],
+  ["if.else", "if.end",  "U"],
+]
+
+[[function.block]]
+name = "entry"
+lines = [10]
+code = "if (a > b)"
+cond = "a > b"
+ir = "icmp sgt"
+
+[[function.block]]
+name = "if.then"
+lines = [11]
+code = "m = a;"
+
+[[function.block]]
+name = "if.else"
+lines = [13]
+code = "m = b;"
+
+[[function.block]]
+name = "if.end"
+lines = [14]
+code = "return m;"
+
+[[function]]
+name = "sign"
+decisions = 2
+exits = ["if.end4"]
+back_edges = []
+edges = [
+  ["entry",    "if.then",  "T"],
+  ["entry",    "if.else",  "F"],
+  ["if.then",  "if.end4",  "U"],
+  ["if.else",  "if.then2", "T"],
+  ["if.else",  "if.else3", "F"],
+  ["if.then2", "if.end",   "U"],
+  ["if.else3", "if.end",   "U"],
+  ["if.end",   "if.end4",  "U"],
+]
+
+[[function.block]]
+name = "entry"
+lines = [19]
+code = "if (x > 0)"
+cond = "x > 0"
+ir = "icmp sgt"
+
+[[function.block]]
+name = "if.then"
+lines = [20]
+code = "s = 1;"
+
+[[function.block]]
+name = "if.else"
+lines = [21]
+code = "else if (x < 0)"
+cond = "x < 0"
+ir = "icmp slt"
+
+[[function.block]]
+name = "if.then2"
+lines = [22]
+code = "s = -1;"
+
+[[function.block]]
+name = "if.else3"
+lines = [24]
+code = "s = 0;"
+
+[[function.block]]
+name = "if.end"
+lines = []
+code = "(empty join of the inner if-else: only a jump)"
+
+[[function.block]]
+name = "if.end4"
+lines = [25]
+code = "return s;"

@@ -1,6 +1,6 @@
 # Architecture: C/HLL ↔ Assembly Control-Flow Consistency Verifier
 
-> **Status:** Part 0 design, draft v0.1 (2026-09-20).
+> **Status:** Part 0 design, draft v0.1 (2026-09-20). Parts 1 and 2 are done; see §12.
 > Anything marked **TO CONFIRM WITH PROFESSOR** is still open. Every open item is collected in
 > [`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md), and this document refers to them by ID (for example **[A1]**).
 > Anything labelled *design choice* is our own engineering decision. It can be changed and is **not** a requirement from the professor.
@@ -231,17 +231,25 @@ btp-cfg-verifier/
 ├── docs/
 │   ├── ARCHITECTURE.md       This document (Part 0)
 │   ├── OPEN_QUESTIONS.md     Register of items TO CONFIRM WITH PROFESSOR
-│   └── ENVIRONMENT.md        Part 1: every tool, why it is needed, how to check it
+│   ├── ENVIRONMENT.md        Part 1: every tool, why it is needed, how to check it
+│   ├── CONTROL_FLOW_FUNDAMENTALS.md  Part 2: each C construct → blocks, edges, conditions, back edges, CFG
+│   └── cfg/                  Expected-CFG diagrams (SVG), generated from regression/expected
 ├── scripts/
 │   ├── setup_wsl.sh          Installs the toolchain on Ubuntu (WSL2), creates .venv
-│   └── checkpoint_part1.sh   Runs the C → LLVM IR checkpoint end to end
+│   ├── checkpoint_part1.sh   Runs the C → LLVM IR checkpoint end to end
+│   └── check_part2.sh        Checks the regression programs' expected CFGs against LLVM
 ├── examples/c/               Small C programs used for smoke tests
+├── regression/
+│   ├── c/                    Part 2 regression programs, one per construct (not an input limit)
+│   └── expected/             Hand-derived expected CFG of each function (TOML), checked against LLVM
 ├── tests/                    pytest suite (Part 1: environment and C → IR tests)
 ├── build/                    Generated files (IR, DOT, SVG, toolchain.json); git-ignored
 └── src/cfgverify/
     ├── cli.py                Command-line entry point (`cfgverify ...`)
     ├── config.py             Single source of truth for compiler flags and paths
     ├── toolchain.py          Find external tools and record their versions      [Part 1]
+    ├── graph_utils.py        Dominators, back edges, natural loops, cyclomatic   [Part 2]
+    ├── expected.py           Load, draw and document the expected CFGs           [Part 2]
     ├── pipeline.py           Orchestrates stages 1–9                           [stub]
     ├── model/
     │   ├── cfg.py            BasicBlock, Edge, EdgeKind, CFG, Function          [stub]
@@ -461,14 +469,20 @@ ordinary instructions); **integer** conditions of native word size or smaller.
 - **Oracle check:** our HLL CFG must equal LLVM's `dot-cfg` graph for every test program.
 - Test set supplied by the professor: **[F1]**.
 
-## 12. Proposed roadmap after Part 1 (for discussion, not a requirement)
+## 12. Roadmap
 
-| Part | Content | Blocked by |
+Part numbers follow the project brief. Items marked *proposal* are our suggestions for the parts the brief has not
+defined yet. They are for discussion and are not requirements.
+
+| Part | Content | Status / blocked by |
 |---|---|---|
-| 2 | CFG data model + IR reader + HLL CFG builder + oracle tests + Phase A C corpus | [B3] |
-| 3 | Assembly reader + first ISA plug-in + ASM CFG builder | [A1]–[A5] |
-| 4 | Normalization N1–N6 + rule log | [C5] |
-| 5 | Matcher L0–L2 + diagnosis + verdict + JSON/Markdown report + SVG diagrams | [C1], [C3], [D1] |
-| 6 | Mutation-based evaluation | [F1] |
-| 7 | AI explanation with guardrails | [E1] |
-| 8 | Phase B constructs (switch, goto, noreturn), L3 anchors, L4 polarity | [B3], [C1] |
+| 0 | Project understanding and design (this document) | Done |
+| 1 | Development environment; C → LLVM IR checkpoint | Done |
+| 2 | C/HLL control-flow fundamentals + regression programs ([`CONTROL_FLOW_FUNDAMENTALS.md`](CONTROL_FLOW_FUNDAMENTALS.md)) | Done |
+| *proposal* | CFG data model + IR reader + HLL CFG builder, checked against the Part 2 expected CFGs and the LLVM oracle | [B3] |
+| *proposal* | Assembly reader + first ISA plug-in + ASM CFG builder | [A1]–[A5] |
+| *proposal* | Normalization N1–N6 + rule log | [C5] |
+| *proposal* | Matcher L0–L2 + diagnosis + verdict + JSON/Markdown report + SVG diagrams | [C1], [C3], [D1] |
+| *proposal* | Mutation-based evaluation | [F1] |
+| *proposal* | AI explanation with guardrails | [E1] |
+| *proposal* | More constructs (`&&`/`||`, `?:`, switch, goto, noreturn), L3 anchors, L4 polarity | [B3], [C1] |

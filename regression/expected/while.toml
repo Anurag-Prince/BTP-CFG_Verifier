@@ -1,0 +1,39 @@
+# Expected CFG (hand-derived) for regression/c/while.c. Block names are the ones Clang -O0 generates.
+# Checked against LLVM (opt -passes=dot-cfg) by tests/test_regression_cfgs.py. Format: src/cfgverify/expected.py
+program = "while.c"
+construct = "while loop"
+
+[[function]]
+name = "sum_to"
+decisions = 1
+exits = ["while.end"]
+back_edges = [["while.body", "while.cond"]]
+loops = [{ header = "while.cond", depth = 1, body = ["while.cond", "while.body"] }]
+edges = [
+  ["entry",      "while.cond", "U"],
+  ["while.cond", "while.body", "T", "run the body"],
+  ["while.cond", "while.end",  "F", "leave the loop"],
+  ["while.body", "while.cond", "U", "test again"],
+]
+
+[[function.block]]
+name = "entry"
+lines = [9, 10]
+code = "sum = 0;  i = 1;"
+
+[[function.block]]
+name = "while.cond"
+lines = [11]
+code = "while (i <= n)"
+cond = "i <= n"
+ir = "icmp sle"
+
+[[function.block]]
+name = "while.body"
+lines = [12, 13]
+code = "sum += i;  i++;"
+
+[[function.block]]
+name = "while.end"
+lines = [15]
+code = "return sum;"

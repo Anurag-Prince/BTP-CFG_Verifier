@@ -18,6 +18,7 @@ import pydot
 from cfgverify.toolchain import ToolchainError, require_tool, run
 
 _BLOCK_NAME_RE = re.compile(r'^"?\{\s*([^:|\\]+?):')
+_COND_BR_RE = re.compile(r"\bbr i1 (%[\w.]+), label")
 
 
 def export_dot(ll_path: str | Path, out_dir: str | Path) -> dict[str, Path]:
@@ -57,14 +58,30 @@ def load_dot(dot_path: str | Path) -> nx.MultiDiGraph:
         names[node_id] = m.group(1).strip() if m else node_id
 
     g = nx.MultiDiGraph(function=Path(dot_path).stem)
-    for node_id, block in names.items():
-        g.add_node(block)
+    for node in graph.get_nodes():
+        node_id = node.get_name()
+        if node_id in names:
+            # Keep LLVM's text for the block (its instructions) so callers can inspect the terminator.
+            g.add_node(names[node_id], ir_text=node.get_attributes().get("label", ""))
     for edge in graph.get_edges():
         src, _, port = edge.get_source().partition(":")
         dst = edge.get_destination().partition(":")[0]
         succ_index = int(port[1:]) if port.startswith("s") and port[1:].isdigit() else 0
         g.add_edge(names.get(src, src), names.get(dst, dst), succ_index=succ_index)
     return g
+
+
+def branch_predicate(ir_text: str) -> str | None:
+    """For a block that ends in `br i1 %c, ...`, return the instruction that defines %c, as "<opcode> <predicate>".
+
+    For example "icmp slt". Returns None if the block has no conditional branch, or if %c is not defined in
+    this block by an icmp/fcmp.
+    """
+    m = _COND_BR_RE.search(ir_text)
+    if not m:
+        return None
+    d = re.search(re.escape(m.group(1)) + r" = (icmp|fcmp) (\w+)", ir_text)
+    return f"{d.group(1)} {d.group(2)}" if d else None
 
 
 def summarize(g: nx.MultiDiGraph) -> dict:

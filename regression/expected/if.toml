@@ -1,0 +1,66 @@
+# Expected CFG (hand-derived) for regression/c/if.c. Block names are the ones Clang -O0 generates.
+# Checked against LLVM (opt -passes=dot-cfg) by tests/test_regression_cfgs.py. Format: src/cfgverify/expected.py
+program = "if.c"
+construct = "if (no else); if with an early return"
+
+[[function]]
+name = "clamp_negative"
+decisions = 1
+exits = ["if.end"]
+back_edges = []
+edges = [
+  ["entry",   "if.then", "T"],
+  ["entry",   "if.end",  "F", "skip the then-block"],
+  ["if.then", "if.end",  "U"],
+]
+
+[[function.block]]
+name = "entry"
+lines = [9, 10]
+code = "int y = x;  if (x < 0)"
+cond = "x < 0"
+ir = "icmp slt"
+
+[[function.block]]
+name = "if.then"
+lines = [11]
+code = "y = 0;"
+
+[[function.block]]
+name = "if.end"
+lines = [12]
+code = "return y;"
+
+[[function]]
+name = "safe_div"
+decisions = 1
+exits = ["return"]
+back_edges = []
+edges = [
+  ["entry",   "if.then", "T"],
+  ["entry",   "if.end",  "F"],
+  ["if.then", "return",  "U", "early return"],
+  ["if.end",  "return",  "U"],
+]
+
+[[function.block]]
+name = "entry"
+lines = [16]
+code = "if (b == 0)"
+cond = "b == 0"
+ir = "icmp eq"
+
+[[function.block]]
+name = "if.then"
+lines = [17]
+code = "return 0;  (stores 0 in %retval)"
+
+[[function.block]]
+name = "if.end"
+lines = [18]
+code = "return a / b;  (stores a / b in %retval)"
+
+[[function.block]]
+name = "return"
+lines = []
+code = "load %retval; ret  (Clang's single exit block)"

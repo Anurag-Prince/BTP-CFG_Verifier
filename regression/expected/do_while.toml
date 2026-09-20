@@ -1,0 +1,39 @@
+# Expected CFG (hand-derived) for regression/c/do_while.c. Block names are the ones Clang -O0 generates.
+# Checked against LLVM (opt -passes=dot-cfg) by tests/test_regression_cfgs.py. Format: src/cfgverify/expected.py
+program = "do_while.c"
+construct = "do-while loop"
+
+[[function]]
+name = "count_digits"
+decisions = 1
+exits = ["do.end"]
+back_edges = [["do.cond", "do.body"]]
+loops = [{ header = "do.body", depth = 1, body = ["do.body", "do.cond"] }]
+edges = [
+  ["entry",   "do.body", "U", "always enter: at least one iteration"],
+  ["do.body", "do.cond", "U"],
+  ["do.cond", "do.body", "T", "repeat"],
+  ["do.cond", "do.end",  "F", "leave the loop"],
+]
+
+[[function.block]]
+name = "entry"
+lines = [9]
+code = "digits = 0;"
+
+[[function.block]]
+name = "do.body"
+lines = [11, 12]
+code = "digits++;  n /= 10;"
+
+[[function.block]]
+name = "do.cond"
+lines = [13]
+code = "while (n != 0)"
+cond = "n != 0"
+ir = "icmp ne"
+
+[[function.block]]
+name = "do.end"
+lines = [14]
+code = "return digits;"

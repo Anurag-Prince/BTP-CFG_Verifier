@@ -1,0 +1,45 @@
+# Expected CFG (hand-derived) for regression/c/for.c. Block names are the ones Clang -O0 generates.
+# Checked against LLVM (opt -passes=dot-cfg) by tests/test_regression_cfgs.py. Format: src/cfgverify/expected.py
+program = "for.c"
+construct = "for loop"
+
+[[function]]
+name = "factorial"
+decisions = 1
+exits = ["for.end"]
+back_edges = [["for.inc", "for.cond"]]
+loops = [{ header = "for.cond", depth = 1, body = ["for.cond", "for.body", "for.inc"] }]
+edges = [
+  ["entry",    "for.cond", "U"],
+  ["for.cond", "for.body", "T", "run the body"],
+  ["for.cond", "for.end",  "F", "leave the loop"],
+  ["for.body", "for.inc",  "U"],
+  ["for.inc",  "for.cond", "U", "test again"],
+]
+
+[[function.block]]
+name = "entry"
+lines = [9, 10]
+code = "f = 1;  int i = 2   (init)"
+
+[[function.block]]
+name = "for.cond"
+lines = [10]
+code = "i <= n   (condition)"
+cond = "i <= n"
+ir = "icmp sle"
+
+[[function.block]]
+name = "for.body"
+lines = [11]
+code = "f *= i;"
+
+[[function.block]]
+name = "for.inc"
+lines = [10]
+code = "i++   (step)"
+
+[[function.block]]
+name = "for.end"
+lines = [12]
+code = "return f;"

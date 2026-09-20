@@ -1,0 +1,187 @@
+# Expected CFG (hand-derived) for regression/c/break.c. Block names are the ones Clang -O0 generates.
+# Checked against LLVM (opt -passes=dot-cfg) by tests/test_regression_cfgs.py. Format: src/cfgverify/expected.py
+program = "break.c"
+construct = "break"
+
+[[function]]
+name = "first_multiple"
+decisions = 2
+exits = ["for.end"]
+back_edges = [["for.inc", "for.cond"]]
+loops = [{ header = "for.cond", depth = 1, body = ["for.cond", "for.body", "if.end", "for.inc"] }]
+edges = [
+  ["entry",    "for.cond", "U"],
+  ["for.cond", "for.body", "T"],
+  ["for.cond", "for.end",  "F", "normal loop exit"],
+  ["for.body", "if.then",  "T"],
+  ["for.body", "if.end",   "F"],
+  ["if.then",  "for.end",  "U", "break: second loop exit"],
+  ["if.end",   "for.inc",  "U"],
+  ["for.inc",  "for.cond", "U"],
+]
+
+[[function.block]]
+name = "entry"
+lines = [13, 14]
+code = "found = -1;  int i = 1"
+
+[[function.block]]
+name = "for.cond"
+lines = [14]
+code = "i <= n"
+cond = "i <= n"
+ir = "icmp sle"
+
+[[function.block]]
+name = "for.body"
+lines = [15]
+code = "if (i % k == 0)"
+cond = "i % k == 0"
+ir = "icmp eq"
+
+[[function.block]]
+name = "if.then"
+lines = [16, 17]
+code = "found = i;  break;"
+
+[[function.block]]
+name = "if.end"
+lines = []
+code = "(rest of the loop body: empty, only a jump)"
+
+[[function.block]]
+name = "for.inc"
+lines = [14]
+code = "i++"
+
+[[function.block]]
+name = "for.end"
+lines = [20]
+code = "return found;"
+
+[[function]]
+name = "halvings"
+decisions = 1
+exits = ["while.end"]
+back_edges = [["if.end", "while.body"]]
+loops = [{ header = "while.body", depth = 1, body = ["while.body", "if.end"] }]
+edges = [
+  ["entry",      "while.body", "U", "while (1): no condition block"],
+  ["while.body", "if.then",    "T"],
+  ["while.body", "if.end",     "F"],
+  ["if.then",    "while.end",  "U", "break: the ONLY loop exit"],
+  ["if.end",     "while.body", "U"],
+]
+
+[[function.block]]
+name = "entry"
+lines = [25]
+code = "steps = 0;"
+
+[[function.block]]
+name = "while.body"
+lines = [27]
+code = "if (n <= 1)"
+cond = "n <= 1"
+ir = "icmp sle"
+
+[[function.block]]
+name = "if.then"
+lines = [28]
+code = "break;"
+
+[[function.block]]
+name = "if.end"
+lines = [29, 30]
+code = "n = n / 2;  steps++;"
+
+[[function.block]]
+name = "while.end"
+lines = [32]
+code = "return steps;"
+
+[[function]]
+name = "capped_pairs"
+decisions = 3
+exits = ["for.end8"]
+back_edges = [["for.inc", "for.cond1"], ["for.inc6", "for.cond"]]
+loops = [
+  { header = "for.cond",  depth = 1, body = ["for.cond", "for.body", "for.cond1", "for.body3", "if.then", "if.end", "for.inc", "for.end", "for.inc6"] },
+  { header = "for.cond1", depth = 2, body = ["for.cond1", "for.body3", "if.end", "for.inc"] },
+]
+edges = [
+  ["entry",     "for.cond",  "U"],
+  ["for.cond",  "for.body",  "T"],
+  ["for.cond",  "for.end8",  "F", "leave outer loop"],
+  ["for.body",  "for.cond1", "U"],
+  ["for.cond1", "for.body3", "T"],
+  ["for.cond1", "for.end",   "F", "leave inner loop normally"],
+  ["for.body3", "if.then",   "T"],
+  ["for.body3", "if.end",    "F"],
+  ["if.then",   "for.end",   "U", "break: leaves ONLY the inner loop"],
+  ["if.end",    "for.inc",   "U"],
+  ["for.inc",   "for.cond1", "U"],
+  ["for.end",   "for.inc6",  "U"],
+  ["for.inc6",  "for.cond",  "U"],
+]
+
+[[function.block]]
+name = "entry"
+lines = [37, 38]
+code = "count = 0;  int i = 0"
+
+[[function.block]]
+name = "for.cond"
+lines = [38]
+code = "i < n   (outer)"
+cond = "i < n"
+ir = "icmp slt"
+
+[[function.block]]
+name = "for.body"
+lines = [39]
+code = "int j = 0"
+
+[[function.block]]
+name = "for.cond1"
+lines = [39]
+code = "j < n   (inner)"
+cond = "j < n"
+ir = "icmp slt"
+
+[[function.block]]
+name = "for.body3"
+lines = [40]
+code = "if (j > i)"
+cond = "j > i"
+ir = "icmp sgt"
+
+[[function.block]]
+name = "if.then"
+lines = [41]
+code = "break;"
+
+[[function.block]]
+name = "if.end"
+lines = [42]
+code = "count++;"
+
+[[function.block]]
+name = "for.inc"
+lines = [39]
+code = "j++   (inner step)"
+
+[[function.block]]
+name = "for.end"
+lines = []
+code = "(inner loop exit: only a jump)"
+
+[[function.block]]
+name = "for.inc6"
+lines = [38]
+code = "i++   (outer step)"
+
+[[function.block]]
+name = "for.end8"
+lines = [45]
+code = "return count;"

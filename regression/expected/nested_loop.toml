@@ -1,0 +1,75 @@
+# Expected CFG (hand-derived) for regression/c/nested_loop.c. Block names are the ones Clang -O0 generates.
+# Checked against LLVM (opt -passes=dot-cfg) by tests/test_regression_cfgs.py. Format: src/cfgverify/expected.py
+program = "nested_loop.c"
+construct = "nested loops (for inside for)"
+
+[[function]]
+name = "count_pairs"
+decisions = 2
+exits = ["for.end7"]
+back_edges = [["for.inc", "for.cond1"], ["for.inc5", "for.cond"]]
+loops = [
+  { header = "for.cond",  depth = 1, body = ["for.cond", "for.body", "for.cond1", "for.body3", "for.inc", "for.end", "for.inc5"] },
+  { header = "for.cond1", depth = 2, body = ["for.cond1", "for.body3", "for.inc"] },
+]
+edges = [
+  ["entry",     "for.cond",  "U"],
+  ["for.cond",  "for.body",  "T", "enter outer body"],
+  ["for.cond",  "for.end7",  "F", "leave outer loop"],
+  ["for.body",  "for.cond1", "U"],
+  ["for.cond1", "for.body3", "T", "enter inner body"],
+  ["for.cond1", "for.end",   "F", "leave inner loop"],
+  ["for.body3", "for.inc",   "U"],
+  ["for.inc",   "for.cond1", "U", "inner loop again"],
+  ["for.end",   "for.inc5",  "U"],
+  ["for.inc5",  "for.cond",  "U", "outer loop again"],
+]
+
+[[function.block]]
+name = "entry"
+lines = [10, 11]
+code = "count = 0;  int i = 0   (outer init)"
+
+[[function.block]]
+name = "for.cond"
+lines = [11]
+code = "i < n   (outer condition)"
+cond = "i < n"
+ir = "icmp slt"
+
+[[function.block]]
+name = "for.body"
+lines = [12]
+code = "int j = 0   (inner init)"
+
+[[function.block]]
+name = "for.cond1"
+lines = [12]
+code = "j < i   (inner condition)"
+cond = "j < i"
+ir = "icmp slt"
+
+[[function.block]]
+name = "for.body3"
+lines = [13]
+code = "count++;"
+
+[[function.block]]
+name = "for.inc"
+lines = [12]
+code = "j++   (inner step)"
+
+[[function.block]]
+name = "for.end"
+lines = []
+code = "(inner loop exit: only a jump)"
+
+[[function.block]]
+name = "for.inc5"
+lines = [11]
+code = "i++   (outer step)"
+
+[[function.block]]
+name = "for.end7"
+lines = [16]
+code = "return count;"

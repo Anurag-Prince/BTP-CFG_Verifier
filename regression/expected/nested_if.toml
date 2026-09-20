@@ -1,0 +1,80 @@
+# Expected CFG (hand-derived) for regression/c/nested_if.c. Block names are the ones Clang -O0 generates.
+# Checked against LLVM (opt -passes=dot-cfg) by tests/test_regression_cfgs.py. Format: src/cfgverify/expected.py
+program = "nested_if.c"
+construct = "nested if-else"
+
+[[function]]
+name = "quadrant"
+decisions = 3
+exits = ["if.end8"]
+back_edges = []
+edges = [
+  ["entry",    "if.then",  "T"],
+  ["entry",    "if.else3", "F"],
+  ["if.then",  "if.then2", "T"],
+  ["if.then",  "if.else",  "F"],
+  ["if.then2", "if.end",   "U"],
+  ["if.else",  "if.end",   "U"],
+  ["if.end",   "if.end8",  "U"],
+  ["if.else3", "if.then5", "T"],
+  ["if.else3", "if.else6", "F"],
+  ["if.then5", "if.end7",  "U"],
+  ["if.else6", "if.end7",  "U"],
+  ["if.end7",  "if.end8",  "U"],
+]
+
+[[function.block]]
+name = "entry"
+lines = [10]
+code = "if (x >= 0)"
+cond = "x >= 0"
+ir = "icmp sge"
+
+[[function.block]]
+name = "if.then"
+lines = [11]
+code = "if (y >= 0)   (inner if, outer then-arm)"
+cond = "y >= 0"
+ir = "icmp sge"
+
+[[function.block]]
+name = "if.then2"
+lines = [12]
+code = "q = 1;"
+
+[[function.block]]
+name = "if.else"
+lines = [14]
+code = "q = 4;   (INNER else)"
+
+[[function.block]]
+name = "if.end"
+lines = []
+code = "(inner join: only a jump)"
+
+[[function.block]]
+name = "if.else3"
+lines = [16]
+code = "if (y >= 0)   (inner if, OUTER else-arm)"
+cond = "y >= 0"
+ir = "icmp sge"
+
+[[function.block]]
+name = "if.then5"
+lines = [17]
+code = "q = 2;"
+
+[[function.block]]
+name = "if.else6"
+lines = [19]
+code = "q = 3;"
+
+[[function.block]]
+name = "if.end7"
+lines = []
+code = "(inner join: only a jump)"
+
+[[function.block]]
+name = "if.end8"
+lines = [21]
+code = "return q;"
