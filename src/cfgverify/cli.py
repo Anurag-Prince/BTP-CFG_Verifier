@@ -9,6 +9,10 @@ Part 2 command
     expected-cfgs   draw the expected CFGs of the regression programs and refresh the generated parts of
                     docs/CONTROL_FLOW_FUNDAMENTALS.md (--check: only report whether the doc is up to date)
 
+Part 3 command
+    parse-ir   read a .ll file (or compile a .c file first) and list every function's basic blocks,
+               terminators, successors, predecessors and edges (--crosscheck: compare with LLVM's own views)
+
 Later parts add `verify <file.c> <file.s>` (pipeline.py). It is not available yet.
 """
 
@@ -113,6 +117,89 @@ def _cmd_expected_cfgs(args: argparse.Namespace) -> int:
     return 0
 
 
+def _fmt_succ(b) -> str:
+    return " ".join(f"{s.role}:{s.target}" for s in b.terminator.successors) or "-"
+
+
+def _cmd_parse_ir(args: argparse.Namespace) -> int:
+    from cfgverify.hll import ir_reader
+    from cfgverify.hll.frontend import FrontendError, emit_llvm_ir
+
+    src = Path(args.input)
+    if src.suffix == ".c":
+        try:
+            ll = emit_llvm_ir(src, args.output, target=args.target,
+                              extra_flags=("-g",) if args.debug_info else ())
+        except FrontendError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
+    else:
+        ll = src
+    try:
+        module = ir_reader.read_ir(ll)
+    except ir_reader.IRParseError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    names = args.function or list(module.functions)
+    missing = [n for n in names if n not in module.functions]
+    if missing:
+        print(f"ERROR: no such function(s): {', '.join(missing)}", file=sys.stderr)
+        return 1
+
+    print(f"{ll}: target {module.target_triple}, {len(module.functions)} defined function(s), "
+          f"{len(module.declarations)} declaration(s)")
+    for name in names:
+        fn = module.functions[name]
+        decisions = sum(1 for b in fn.blocks if b.terminator.kind == "cond_br")
+        print(f"\n@{name}  (.ll line {fn.line}): {len(fn.blocks)} blocks, {len(fn.edges())} edges, "
+              f"{decisions} conditional branches, entry %{fn.entry.name}")
+        rows = []
+        for b in fn.blocks:
+            cond = fn.condition_of(b)
+            if cond:
+                ctext = f"{cond.opcode} {cond.predicate or ''} {', '.join(cond.operands)}".replace("  ", " ")
+            elif b.terminator.kind == "cond_br":
+                ctext = f"{b.terminator.condition} (constant or not defined by a compare)"
+            else:
+                ctext = ""
+            rows.append((f"%{b.name}", str(len(b.instructions)), b.terminator.kind, _fmt_succ(b),
+                         ",".join(b.predecessors) or "-", ctext, b))
+        head = ("block", "insts", "terminator", "successors (role:target)", "predecessors", "condition")
+        widths = [max(len(head[k]), *(len(r[k]) for r in rows)) for k in range(5)]
+        fmt = "  {:<%d}  {:>%d}  {:<%d}  {:<%d}  {:<%d}  {}" % tuple(widths)
+        print(fmt.format(*head))
+        for *cols, b in rows:
+            print(fmt.format(*cols))
+            if args.instructions:
+                for inst in b.instructions:
+                    src_line = f"  [C line {inst.source_line}]" if inst.source_line else ""
+                    print(f"      {inst.line:>5}: {inst.text}{src_line}")
+        unsupported = fn.unsupported_terminators()
+        if unsupported:
+            kinds = sorted({b.terminator.kind for b in unsupported})
+            print(f"  note: terminator(s) outside the Phase A subset: {', '.join(kinds)} "
+                  f"(read correctly; later stages report them as UNSUPPORTED)")
+
+    if args.json:
+        out = Path(args.json)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(ir_reader.module_to_dict(module), indent=2))
+        print(f"\nJSON written to {out}")
+
+    if args.crosscheck:
+        from cfgverify.hll.ir_crosscheck import crosscheck
+
+        problems = crosscheck(ll, module)
+        if problems:
+            print("\nCROSS-CHECK FAILED:")
+            for p in problems:
+                print(f"  - {p}")
+            return 2
+        print("\nCross-check: blocks, edges and predecessors agree with opt dot-cfg, LLVM's preds comments and llvmlite.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="cfgverify", description=__doc__.splitlines()[0])
     p.add_argument("--version", action="version", version=f"cfgverify {__version__}")
@@ -140,6 +227,17 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--doc", default="docs/CONTROL_FLOW_FUNDAMENTALS.md", help="study document to refresh")
     x.add_argument("--check", action="store_true", help="only check that the document is up to date")
     x.set_defaults(func=_cmd_expected_cfgs)
+
+    r = sub.add_parser("parse-ir", help="list blocks, terminators, successors, predecessors and edges of IR")
+    r.add_argument("input", help="LLVM IR file (.ll) or C file (.c, compiled first)")
+    r.add_argument("-o", "--output", help="where to write the .ll when the input is C (default: build/<name>.ll)")
+    r.add_argument("--target", help="target triple when compiling C (default: host)")
+    r.add_argument("-g", "--debug-info", action="store_true", help="compile C with -g to get C source lines")
+    r.add_argument("-f", "--function", action="append", help="only this function (repeatable)")
+    r.add_argument("-i", "--instructions", action="store_true", help="also print every instruction")
+    r.add_argument("--json", help="also write the full result as JSON")
+    r.add_argument("--crosscheck", action="store_true", help="compare with opt dot-cfg, LLVM preds comments, llvmlite")
+    r.set_defaults(func=_cmd_parse_ir)
     return p
 
 

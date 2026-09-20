@@ -39,7 +39,7 @@ Suggested order for the first meeting: **A1, A3, A4, C1**. These four decide mos
 | C2 | **Per-function (intraprocedural) CFG only**, or is interprocedural flow (call graph, call order) also in scope? | Scope of the model and the matcher. | Per function; calls are ordinary instructions. | OPEN |
 | C3 | Must the output be strictly **MATCH/MISMATCH**, or may the tool answer **UNSUPPORTED** when input is outside the subset? | Avoids forced guesses, since a false MATCH is the worst possible error. | Proposed: yes, UNSUPPORTED is allowed. | OPEN |
 | C4 | Verdict **per program only**, or **per function** as well? | Report design. | Both (per function, then aggregated). | OPEN |
-| C5 | **Approve the normalization rules** N1–N7 (ARCHITECTURE §7.4). Are any of them considered "too forgiving"? | Normalization decides what counts as an irrelevant difference. | N1–N6 as proposed; N7 in Phase B. | OPEN |
+| C5 | **Approve the normalization rules** N1–N8 (ARCHITECTURE §7.4). Are any of them considered "too forgiving"? | Normalization decides what counts as an irrelevant difference. | N1–N6 as proposed; N7 in Phase B; N8 only if the assembly producer folds constant conditions. | OPEN |
 
 ## D. Interface and outputs
 

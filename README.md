@@ -18,6 +18,7 @@ has already produced.
 | Open requirements | Listed in [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md), each marked **TO CONFIRM WITH PROFESSOR** |
 | **Part 1**: development environment, C → LLVM IR checkpoint | Done. See below and [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md) |
 | **Part 2**: C/HLL control-flow fundamentals + regression programs | Done. See [`docs/CONTROL_FLOW_FUNDAMENTALS.md`](docs/CONTROL_FLOW_FUNDAMENTALS.md) and [`regression/`](regression) |
+| **Part 3**: LLVM IR generation and parsing (IR reader) | Done. See [`docs/LLVM_IR_GUIDE.md`](docs/LLVM_IR_GUIDE.md) |
 | Later parts | Not started. Roadmap in ARCHITECTURE §12 |
 
 > The target assembly architecture is **not yet decided** (TO CONFIRM WITH PROFESSOR). Nothing in this repo assumes
@@ -63,6 +64,15 @@ bash scripts/check_part2.sh          # or: make regression
 This checks the hand-derived expected CFG of every regression function against LLVM's own CFG. It ends with
 `PART 2 CHECK PASSED`. The study notes with all expected CFG diagrams are in `docs/CONTROL_FLOW_FUNDAMENTALS.md`.
 
+### 6. Run the Part 3 checkpoint
+```bash
+bash scripts/checkpoint_part3.sh                 # the new programs in examples/c/part3/
+bash scripts/checkpoint_part3.sh my_program.c    # or any C file of your own
+```
+It compiles each file to LLVM IR and prints every function's blocks, terminators, successors and predecessors. It
+cross-checks the result against LLVM itself, then runs the reader tests, including 100 random C programs per mode.
+It ends with `CHECKPOINT PART 3 PASSED`. This takes a few minutes.
+
 ---
 
 ## Commands
@@ -73,7 +83,8 @@ This checks the hand-derived expected CFG of every regression function against L
 | `cfgverify emit-ir FILE.c [-o OUT.ll] [--target TRIPLE]` | C → LLVM IR with the project's canonical flags (`-S -emit-llvm -O0 -fno-discard-value-names`) |
 | `cfgverify llvm-cfg FILE.ll [-o DIR]` | LLVM's own per-function CFG (`opt -passes=dot-cfg`) → DOT + SVG + a networkx summary |
 | `cfgverify expected-cfgs [--check]` | Part 2: redraws `docs/cfg/*.svg` from `regression/expected/*.toml` and refreshes the generated parts of the study doc |
-| `make test` / `pytest` | All tests: environment, C → IR, and Part 2 regression CFGs |
+| `cfgverify parse-ir FILE.c\|FILE.ll [-g] [-i] [-f FN] [--json OUT] [--crosscheck]` | Part 3: blocks, instructions, terminators, successors, predecessors and edges of every function. `--crosscheck` compares them with LLVM |
+| `make test` / `pytest` | All tests: environment, C → IR, Part 2 regression CFGs, Part 3 IR reader (about 1–2 minutes) |
 
 `python -m cfgverify ...` works the same way as `cfgverify ...`.
 
@@ -81,14 +92,14 @@ This checks the hand-derived expected CFG of every regression function against L
 
 ```
 docs/              ARCHITECTURE.md (Part 0), OPEN_QUESTIONS.md (for the professor), ENVIRONMENT.md (Part 1),
-                   CONTROL_FLOW_FUNDAMENTALS.md + cfg/*.svg (Part 2)
-scripts/           setup_wsl.sh, checkpoint_part1.sh, check_part2.sh
-examples/c/        hello_cfg.c (smoke-test program)
+                   CONTROL_FLOW_FUNDAMENTALS.md + cfg/*.svg (Part 2), LLVM_IR_GUIDE.md (Part 3)
+scripts/           setup_wsl.sh, checkpoint_part1.sh, check_part2.sh, checkpoint_part3.sh
+examples/c/        hello_cfg.c (smoke-test program), part3/ (Part 3 checkpoint inputs)
 regression/        c/*.c regression programs + expected/*.toml expected CFGs (Part 2)
 src/cfgverify/     the package; each module's docstring states its responsibility and status
   graph_utils.py   dominators, back edges, natural loops (Part 2)
   expected.py      load, draw and document expected CFGs (Part 2)
-  hll/             C → IR → HLL CFG        (frontend.py and llvm_view.py are implemented; others are stubs)
+  hll/             C → IR → HLL CFG        (frontend, llvm_view, ir_reader, ir_crosscheck implemented; cfg_builder is a stub)
   asm/             assembly → ASM CFG      (stubs; blocked until the ISA is confirmed)
   normalize/ match/ report/ explain/      (stubs)
 tests/             pytest suite

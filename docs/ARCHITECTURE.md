@@ -1,6 +1,6 @@
 # Architecture: C/HLL ↔ Assembly Control-Flow Consistency Verifier
 
-> **Status:** Part 0 design, draft v0.1 (2026-09-20). Parts 1 and 2 are done; see §12.
+> **Status:** Part 0 design, draft v0.1 (2026-09-20). Parts 1–3 are done; see §12.
 > Anything marked **TO CONFIRM WITH PROFESSOR** is still open. Every open item is collected in
 > [`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md), and this document refers to them by ID (for example **[A1]**).
 > Anything labelled *design choice* is our own engineering decision. It can be changed and is **not** a requirement from the professor.
@@ -233,12 +233,14 @@ btp-cfg-verifier/
 │   ├── OPEN_QUESTIONS.md     Register of items TO CONFIRM WITH PROFESSOR
 │   ├── ENVIRONMENT.md        Part 1: every tool, why it is needed, how to check it
 │   ├── CONTROL_FLOW_FUNDAMENTALS.md  Part 2: each C construct → blocks, edges, conditions, back edges, CFG
+│   ├── LLVM_IR_GUIDE.md      Part 3: IR generation, IR concepts, construct → IR mapping, the IR reader
 │   └── cfg/                  Expected-CFG diagrams (SVG), generated from regression/expected
 ├── scripts/
 │   ├── setup_wsl.sh          Installs the toolchain on Ubuntu (WSL2), creates .venv
 │   ├── checkpoint_part1.sh   Runs the C → LLVM IR checkpoint end to end
-│   └── check_part2.sh        Checks the regression programs' expected CFGs against LLVM
-├── examples/c/               Small C programs used for smoke tests
+│   ├── check_part2.sh        Checks the regression programs' expected CFGs against LLVM
+│   └── checkpoint_part3.sh   New C file → IR → blocks/edges, cross-checked, reader unchanged
+├── examples/c/               Small C programs: hello_cfg.c (Part 1), part3/ (checkpoint inputs, written after the reader was frozen)
 ├── regression/
 │   ├── c/                    Part 2 regression programs, one per construct (not an input limit)
 │   └── expected/             Hand-derived expected CFG of each function (TOML), checked against LLVM
@@ -257,7 +259,8 @@ btp-cfg-verifier/
     ├── hll/
     │   ├── frontend.py       C → LLVM IR using Clang with canonical flags       [Part 1]
     │   ├── llvm_view.py      LLVM's own CFG (opt dot-cfg), used as a reference oracle   [Part 1]
-    │   ├── ir_reader.py      LLVM IR → functions/blocks/terminators            [stub]
+    │   ├── ir_reader.py      LLVM IR text → functions/blocks/instructions/terminators/edges   [Part 3]
+    │   ├── ir_crosscheck.py  Reader vs. opt dot-cfg, LLVM preds comments, llvmlite           [Part 3]
     │   └── cfg_builder.py    Blocks → HLL CFG                                  [stub]
     ├── asm/
     │   ├── reader.py         Assembly text → labels/directives/instructions    [stub]
@@ -304,13 +307,18 @@ and nothing from `explain/`.
   - `switch` → N edges (outside Phase A).
   - `indirectbr` and `callbr` → UNSUPPORTED in Phase A.
 - **Calls are not terminators**, because the CFG is intraprocedural **[C2]**.
-- **Reader library (design choice):** `llvmlite` (Python bindings to LLVM). In our probe, llvmlite 0.49 (bundling
-  LLVM 22) parsed Clang 18 IR correctly. Pitfall found while probing: llvmlite lists a conditional `br`'s label
-  operands in **LLVM's internal order (false target, then true target)**, not source order. The reader must use
-  the documented operand positions.
-- **Oracle (design choice):** `opt -passes=dot-cfg` makes LLVM itself export each function's CFG. Our builder's
-  CFG must equal LLVM's on every test program. This gives two independent derivations that must agree. Part 1
-  already uses this as the visualization smoke test (`cfgverify llvm-cfg`).
+- **Reader (design choice, revised in Part 3):** a dedicated **text reader** for `.ll` files
+  (`hll/ir_reader.py`, documented in [`LLVM_IR_GUIDE.md`](LLVM_IR_GUIDE.md) §11).
+  - *Original Part 0 proposal:* llvmlite as the reader.
+  - *Why it changed:* llvmlite bundles a second LLVM (22 vs. Clang 18) and hides the `.ll` line numbers, printed
+    names and `!dbg` lines that evidence needs.
+  - *Pitfall to remember:* llvmlite's in-memory operand order for a conditional `br` is (false, true). The text
+    order is (true, false).
+- **Oracles (design choice):** three independent LLVM views must agree with the reader (`hll/ir_crosscheck.py`):
+  - `opt -passes=dot-cfg`, compared edge by edge with successor indices;
+  - LLVM's `; preds =` comments;
+  - llvmlite's parse, compared by opcode sequence per block.
+  The same dot-cfg view also checks the Part 2 expected CFGs.
 
 ### 7.3 Assembly → ASM CFG (`asm/reader.py`, `asm/isa/*`, `asm/cfg_builder.py`)
 **ISA-neutral part (the classic leader algorithm):**
@@ -354,6 +362,7 @@ and **logged** (`NormalizationStep` records go into the evidence). *Proposal, to
 | N5 Degenerate branch | A conditional branch with both targets equal becomes a jump. | Equivalent encodings |
 | N6 Polarity-free edges (stage 1) | Conditional edges are compared as an unordered pair at first. | Compilers invert conditions (see §3.11) |
 | N7 Noreturn sink | Blocks ending in `unreachable` or a known noreturn call go to a TRAP sink. | `exit()`/`abort()` handling (Phase B, **[B3]**) |
+| N8 Constant-condition branch | `br i1 true/false` becomes an unconditional jump to the live target. | `do … while (1)` gives `br i1 true` in Clang `-O0` IR (Part 3, P1). Needed only if the assembly producer folds the constant (**[A3]**). |
 
 N6 is a known weakness, because it hides swapped branch arms. See §10 and L4.
 
@@ -479,7 +488,8 @@ defined yet. They are for discussion and are not requirements.
 | 0 | Project understanding and design (this document) | Done |
 | 1 | Development environment; C → LLVM IR checkpoint | Done |
 | 2 | C/HLL control-flow fundamentals + regression programs ([`CONTROL_FLOW_FUNDAMENTALS.md`](CONTROL_FLOW_FUNDAMENTALS.md)) | Done |
-| *proposal* | CFG data model + IR reader + HLL CFG builder, checked against the Part 2 expected CFGs and the LLVM oracle | [B3] |
+| 3 | LLVM IR generation and parsing: IR reader + cross-checks ([`LLVM_IR_GUIDE.md`](LLVM_IR_GUIDE.md)) | Done |
+| *proposal* | CFG data model + HLL CFG builder on top of the IR reader, checked against the Part 2 expected CFGs | [B3] |
 | *proposal* | Assembly reader + first ISA plug-in + ASM CFG builder | [A1]–[A5] |
 | *proposal* | Normalization N1–N6 + rule log | [C5] |
 | *proposal* | Matcher L0–L2 + diagnosis + verdict + JSON/Markdown report + SVG diagrams | [C1], [C3], [D1] |
