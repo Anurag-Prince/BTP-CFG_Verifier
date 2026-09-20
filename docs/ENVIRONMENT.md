@@ -32,11 +32,12 @@ The development platform does **not** decide which assembly ISA is verified ([A1
 
 | Package | Version | Role |
 |---|---|---|
-| `llvmlite` | 0.49.0 | Python bindings to LLVM. It **reads `.ll` files** and will be used by the IR reader in Part 2. It bundles its own LLVM (22.1), which reads IR from Clang 18 without problems. |
+| `llvmlite` | 0.49.0 | Python bindings to LLVM's own parser. Since Part 3 it is one of the three independent cross-checks of the IR reader, not the reader itself. It bundles its own LLVM (22.1), which reads IR from Clang 18 without problems. |
 | `networkx` | 3.6.1 | Graph data structures and algorithms: dominators and loops, graph isomorphism (VF2) for the matcher |
 | `pydot` | 4.0.1 | Parses DOT files, such as LLVM's `dot-cfg` output, into Python |
 | `graphviz` | 0.21 | Builds and renders our own CFG diagrams from Python (calls the `dot` binary) |
 | `pytest` | 9.1.1 | Test runner |
+| `jsonschema` | 4.26.0 | Validates CFG JSON files against `src/cfgverify/model/cfg.schema.json` (added in Part 4) |
 
 ## Reference versions
 

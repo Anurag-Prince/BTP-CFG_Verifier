@@ -1,7 +1,7 @@
 # Shortcuts. Run inside WSL/Ubuntu from the repo root.
 PY ?= .venv/bin/python
 
-.PHONY: setup env checkpoint regression checkpoint3 docs test clean
+.PHONY: setup env checkpoint regression checkpoint3 checkpoint4 docs test clean
 
 setup:       ## install system packages + create .venv
 	bash scripts/setup_wsl.sh
@@ -17,6 +17,9 @@ regression:  ## Part 2 check: expected CFGs vs LLVM
 
 checkpoint3: ## Part 3 checkpoint: new C files -> IR -> blocks/edges (reader unchanged)
 	bash scripts/checkpoint_part3.sh
+
+checkpoint4: ## Part 4 checkpoint: C files -> HLL CFGs (JSON/SVG/gallery), all checked
+	bash scripts/checkpoint_part4.sh
 
 docs:        ## redraw expected CFGs and refresh docs/CONTROL_FLOW_FUNDAMENTALS.md
 	$(PY) -m cfgverify expected-cfgs

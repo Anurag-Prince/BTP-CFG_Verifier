@@ -37,4 +37,4 @@ OPTIONAL_TOOLS: dict[str, list[str]] = {
     "git": ["git", "--version"],
 }
 
-REQUIRED_PYTHON_PACKAGES: tuple[str, ...] = ("llvmlite", "networkx", "pydot", "graphviz", "pytest")
+REQUIRED_PYTHON_PACKAGES: tuple[str, ...] = ("llvmlite", "networkx", "pydot", "graphviz", "pytest", "jsonschema")

@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cfgverify.cfg/1",
+  "title": "Control-flow graph of one function (cfgverify)",
+  "description": "One node per basic block, one edge per successor slot. Written by `cfgverify hll-cfg`; the assembly side will use the same format with origin \"asm\".",
+  "type": "object",
+  "required": ["schema", "function", "origin", "entry", "exits", "meta", "analysis", "nodes", "edges"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "cfgverify.cfg/1"},
+    "function": {"type": "string", "minLength": 1},
+    "origin": {"enum": ["hll", "asm"]},
+    "entry": {"$ref": "#/$defs/nodeId"},
+    "exits": {"type": "array", "items": {"$ref": "#/$defs/nodeId"}},
+    "meta": {
+      "type": "object",
+      "description": "Where the CFG came from: files, target triple, producer, lines.",
+      "properties": {
+        "c_file": {"type": ["string", "null"]},
+        "ir_file": {"type": ["string", "null"]},
+        "target_triple": {"type": ["string", "null"]},
+        "ir_line": {"type": ["integer", "null"]},
+        "source_line": {"type": ["integer", "null"]},
+        "generator": {"type": "string"},
+        "names": {"type": "object", "additionalProperties": {"type": "string"},
+                  "description": "canonical name (a0, s1, v7, B3) -> name in the input (%n, %i, %cmp, %if.then)"}
+      }
+    },
+    "analysis": {
+      "type": "object",
+      "required": ["blocks", "edges", "decisions", "cyclomatic", "back_edges", "loops", "unreachable", "unsupported"],
+      "properties": {
+        "blocks": {"type": "integer", "minimum": 1},
+        "edges": {"type": "integer", "minimum": 0},
+        "decisions": {"type": "integer", "minimum": 0},
+        "cyclomatic": {"type": "integer"},
+        "back_edges": {"type": "array", "items": {"type": "array", "prefixItems": [{"$ref": "#/$defs/nodeId"}, {"$ref": "#/$defs/nodeId"}], "minItems": 2, "maxItems": 2}},
+        "loops": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["header", "depth", "body"],
+            "properties": {
+              "header": {"$ref": "#/$defs/nodeId"},
+              "depth": {"type": "integer", "minimum": 1},
+              "body": {"type": "array", "items": {"$ref": "#/$defs/nodeId"}, "minItems": 1}
+            }
+          }
+        },
+        "unreachable": {"type": "array", "items": {"$ref": "#/$defs/nodeId"}},
+        "unsupported": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "nodes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/node"}},
+    "edges": {"type": "array", "items": {"$ref": "#/$defs/edge"}}
+  },
+  "$defs": {
+    "nodeId": {"type": "string", "pattern": "^B[0-9]+$"},
+    "operation": {
+      "type": "object",
+      "required": ["op", "kind", "result", "operands", "text", "source_line"],
+      "additionalProperties": false,
+      "properties": {
+        "op": {"enum": ["ALLOC", "LOAD", "STORE", "ARITH", "CMP", "CAST", "ADDR", "CALL", "PHI", "SELECT",
+                        "JUMP", "BRANCH", "SWITCH", "RETURN", "UNREACHABLE", "INDIRECT", "OTHER"]},
+        "kind": {"type": ["string", "null"]},
+        "result": {"type": ["string", "null"]},
+        "operands": {"type": "array", "items": {"type": "string"}},
+        "text": {"type": "string"},
+        "source_line": {"type": ["integer", "null"]}
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": ["id", "label", "index", "instructions", "operations", "predecessors", "successors", "terminator",
+                   "source_lines", "calls", "is_entry", "is_exit", "loop_header", "loop_depth"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"$ref": "#/$defs/nodeId"},
+        "label": {"type": "string"},
+        "index": {"type": "integer", "minimum": 0},
+        "instructions": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["text", "line", "source_line"],
+            "additionalProperties": false,
+            "properties": {
+              "text": {"type": "string"},
+              "line": {"type": ["integer", "null"]},
+              "source_line": {"type": ["integer", "null"]}
+            }
+          }
+        },
+        "operations": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/operation"}},
+        "predecessors": {"type": "array", "items": {"$ref": "#/$defs/nodeId"}},
+        "successors": {"type": "array", "items": {"$ref": "#/$defs/nodeId"}},
+        "terminator": {"type": "string"},
+        "source_lines": {"type": "array", "items": {"type": "integer"}},
+        "calls": {"type": "array", "items": {"type": "string"}},
+        "is_entry": {"type": "boolean"},
+        "is_exit": {"type": "boolean"},
+        "loop_header": {"type": "boolean"},
+        "loop_depth": {"type": "integer", "minimum": 0}
+      }
+    },
+    "edge": {
+      "type": "object",
+      "required": ["id", "source", "destination", "index", "kind", "back_edge", "branch"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^E[0-9]+$"},
+        "source": {"$ref": "#/$defs/nodeId"},
+        "destination": {"$ref": "#/$defs/nodeId"},
+        "index": {"type": "integer", "minimum": 0},
+        "kind": {"type": "string", "pattern": "^(T|F|U|default|case:.+|normal|unwind|indirect|eh)$"},
+        "back_edge": {"type": "boolean"},
+        "branch": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "required": ["taken_when"],
+              "additionalProperties": false,
+              "properties": {
+                "taken_when": {"type": "string"},
+                "condition": {"type": ["string", "null"]},
+                "compare": {"type": ["string", "null"]},
+                "predicate": {"type": ["string", "null"]},
+                "ir": {"type": ["string", "null"]},
+                "case_value": {"type": ["string", "null"]},
+                "source_line": {"type": ["integer", "null"]},
+                "source_text": {"type": ["string", "null"]}
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Mohit" }]
 # Exact pins live in requirements.txt; these are the minimum declarations.
-dependencies = ["llvmlite", "networkx>=3.2", "pydot>=3", "graphviz>=0.20"]
+dependencies = ["llvmlite", "networkx>=3.2", "pydot>=3", "graphviz>=0.20", "jsonschema>=4"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
@@ -20,6 +20,9 @@ cfgverify = "cfgverify.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+cfgverify = ["model/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -13,6 +13,10 @@ Part 3 command
     parse-ir   read a .ll file (or compile a .c file first) and list every function's basic blocks,
                terminators, successors, predecessors and edges (--crosscheck: compare with LLVM's own views)
 
+Part 4 command
+    hll-cfg    C or .ll files -> one HLL CFG per function: JSON (schema cfgverify.cfg/1), Graphviz SVG,
+               and an HTML gallery (--check: schema, round trips, invariants, agreement with LLVM)
+
 Later parts add `verify <file.c> <file.s>` (pipeline.py). It is not available yet.
 """
 
@@ -200,6 +204,63 @@ def _cmd_parse_ir(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_hll_cfg(args: argparse.Namespace) -> int:
+    from cfgverify.hll import cfg_builder, cfg_checks
+    from cfgverify.hll.frontend import FrontendError
+    from cfgverify.hll.ir_reader import IRParseError
+    from cfgverify.model import cfg_dot
+
+    out = Path(args.out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    gallery, failures, total = [], 0, 0
+    print(f"{'program':<22}{'function':<22}{'blocks':>7}{'edges':>7}{'dec':>5}{'loops':>7}{'back':>6}  "
+          f"{'check':<6}notes")
+    for src in args.inputs:
+        src = Path(src)
+        ll = out / f"{src.stem}.ll" if src.suffix == ".c" else src
+        try:
+            cfgs = cfg_builder.cfgs_from_file(src, ll_out=ll if src.suffix == ".c" else None,
+                                              target=args.target, debug_info=not args.no_debug_info)
+        except (FrontendError, IRParseError) as exc:
+            print(f"ERROR: {src}: {exc}", file=sys.stderr)
+            return 1
+        names = args.function or list(cfgs)
+        results = cfg_checks.check_cfgs(cfgs, ll) if args.check else {}
+        for name in names:
+            if name not in cfgs:
+                print(f"ERROR: {src}: no function {name!r}", file=sys.stderr)
+                return 1
+            cfg, total = cfgs[name], total + 1
+            base = f"{src.stem}.{name}"
+            (out / f"{base}.cfg.json").write_text(cfg.to_json())
+            if not args.no_svg:
+                cfg_dot.render(cfg, out / f"{base}.svg", detail=args.detail)
+            a = cfg.analysis
+            problems = results.get(name, [])
+            failures += bool(problems)
+            status = "-" if not args.check else ("FAIL" if problems else "ok")
+            notes = f"unsupported: {', '.join(a['unsupported'])}" if a["unsupported"] else ""
+            print(f"{src.name:<22}{name:<22}{a['blocks']:>7}{a['edges']:>7}{a['decisions']:>5}{len(a['loops']):>7}"
+                  f"{len(a['back_edges']):>6}  {status:<6}{notes}")
+            for p in problems:
+                print(f"    - {p}")
+            summary = (f"{a['blocks']} blocks, {a['edges']} edges, {a['decisions']} decisions, "
+                       f"{len(a['loops'])} loop(s), cyclomatic {a['cyclomatic']}")
+            gallery.append({"program": src.name, "function": name, "svg": f"{base}.svg",
+                            "json": f"{base}.cfg.json", "summary": summary})
+    if not args.no_svg:
+        page = cfg_dot.write_gallery(gallery, out / "index.html")
+        print(f"\n{total} CFG(s): JSON + SVG in {out}/, gallery {page}")
+    else:
+        print(f"\n{total} CFG(s): JSON in {out}/")
+    if args.check:
+        if failures:
+            print(f"CHECK FAILED for {failures} function(s)")
+            return 2
+        print("Check: every CFG passed schema, JSON/NetworkX round trips, invariants, and agreement with LLVM dot-cfg.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="cfgverify", description=__doc__.splitlines()[0])
     p.add_argument("--version", action="version", version=f"cfgverify {__version__}")
@@ -238,6 +299,19 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--json", help="also write the full result as JSON")
     r.add_argument("--crosscheck", action="store_true", help="compare with opt dot-cfg, LLVM preds comments, llvmlite")
     r.set_defaults(func=_cmd_parse_ir)
+
+    h = sub.add_parser("hll-cfg", help="C/.ll files -> HLL CFG per function (JSON, SVG, HTML gallery)")
+    h.add_argument("inputs", nargs="+", help="C files (.c) and/or LLVM IR files (.ll)")
+    h.add_argument("-o", "--out-dir", default=str(config.BUILD_DIR / "hll_cfg"), help="output directory")
+    h.add_argument("-f", "--function", action="append", help="only this function (repeatable)")
+    h.add_argument("--detail", choices=["ops", "ir", "none"], default="ops",
+                   help="what the diagram shows inside each node (default: normalized operations)")
+    h.add_argument("--no-svg", action="store_true", help="JSON only")
+    h.add_argument("--no-debug-info", action="store_true", help="compile C without -g (no C line numbers)")
+    h.add_argument("--target", help="target triple when compiling C (default: host)")
+    h.add_argument("--check", action="store_true",
+                   help="validate schema, JSON/NetworkX round trips, invariants, agreement with LLVM dot-cfg")
+    h.set_defaults(func=_cmd_hll_cfg)
     return p
 
 

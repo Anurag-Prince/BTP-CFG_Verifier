@@ -1,6 +1,6 @@
 # Architecture: C/HLL ↔ Assembly Control-Flow Consistency Verifier
 
-> **Status:** Part 0 design, draft v0.1 (2026-09-20). Parts 1–3 are done; see §12.
+> **Status:** Part 0 design, draft v0.1 (2026-09-20). Parts 1–4 are done; see §12.
 > Anything marked **TO CONFIRM WITH PROFESSOR** is still open. Every open item is collected in
 > [`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md), and this document refers to them by ID (for example **[A1]**).
 > Anything labelled *design choice* is our own engineering decision. It can be changed and is **not** a requirement from the professor.
@@ -234,12 +234,14 @@ btp-cfg-verifier/
 │   ├── ENVIRONMENT.md        Part 1: every tool, why it is needed, how to check it
 │   ├── CONTROL_FLOW_FUNDAMENTALS.md  Part 2: each C construct → blocks, edges, conditions, back edges, CFG
 │   ├── LLVM_IR_GUIDE.md      Part 3: IR generation, IR concepts, construct → IR mapping, the IR reader
+│   ├── HLL_CFG.md            Part 4: the HLL CFG generator (nodes, operations, edges, JSON/NetworkX/Graphviz)
 │   └── cfg/                  Expected-CFG diagrams (SVG), generated from regression/expected
 ├── scripts/
 │   ├── setup_wsl.sh          Installs the toolchain on Ubuntu (WSL2), creates .venv
 │   ├── checkpoint_part1.sh   Runs the C → LLVM IR checkpoint end to end
 │   ├── check_part2.sh        Checks the regression programs' expected CFGs against LLVM
-│   └── checkpoint_part3.sh   New C file → IR → blocks/edges, cross-checked, reader unchanged
+│   ├── checkpoint_part3.sh   New C file → IR → blocks/edges, cross-checked, reader unchanged
+│   └── checkpoint_part4.sh   Many C files → HLL CFGs (JSON/SVG/gallery) with one implementation, all checked
 ├── examples/c/               Small C programs: hello_cfg.c (Part 1), part3/ (checkpoint inputs, written after the reader was frozen)
 ├── regression/
 │   ├── c/                    Part 2 regression programs, one per construct (not an input limit)
@@ -254,14 +256,19 @@ btp-cfg-verifier/
     ├── expected.py           Load, draw and document the expected CFGs           [Part 2]
     ├── pipeline.py           Orchestrates stages 1–9                           [stub]
     ├── model/
-    │   ├── cfg.py            BasicBlock, Edge, EdgeKind, CFG, Function          [stub]
+    │   ├── ops.py            Normalized-operation vocabulary (shared HLL/assembly)        [Part 4]
+    │   ├── cfg.py            CFG / Node / Edge / BranchInfo, analysis, JSON, NetworkX     [Part 4]
+    │   ├── cfg.schema.json   JSON Schema "cfgverify.cfg/1"                                [Part 4]
+    │   ├── cfg_dot.py        Graphviz rendering + HTML gallery                            [Part 4]
     │   └── evidence.py       Finding, NormalizationStep, Mapping, Verdict       [stub]
     ├── hll/
     │   ├── frontend.py       C → LLVM IR using Clang with canonical flags       [Part 1]
     │   ├── llvm_view.py      LLVM's own CFG (opt dot-cfg), used as a reference oracle   [Part 1]
     │   ├── ir_reader.py      LLVM IR text → functions/blocks/instructions/terminators/edges   [Part 3]
     │   ├── ir_crosscheck.py  Reader vs. opt dot-cfg, LLVM preds comments, llvmlite           [Part 3]
-    │   └── cfg_builder.py    Blocks → HLL CFG                                  [stub]
+    │   ├── ir_ops.py         IR instruction → normalized operation (canonical names)     [Part 4]
+    │   ├── cfg_builder.py    IR function → HLL CFG (nodes, edges, branch info, analysis)  [Part 4]
+    │   └── cfg_checks.py     Schema, round trips, invariants, agreement with LLVM         [Part 4]
     ├── asm/
     │   ├── reader.py         Assembly text → labels/directives/instructions    [stub]
     │   ├── cfg_builder.py    Leader algorithm → ASM CFG                        [stub]
@@ -489,7 +496,7 @@ defined yet. They are for discussion and are not requirements.
 | 1 | Development environment; C → LLVM IR checkpoint | Done |
 | 2 | C/HLL control-flow fundamentals + regression programs ([`CONTROL_FLOW_FUNDAMENTALS.md`](CONTROL_FLOW_FUNDAMENTALS.md)) | Done |
 | 3 | LLVM IR generation and parsing: IR reader + cross-checks ([`LLVM_IR_GUIDE.md`](LLVM_IR_GUIDE.md)) | Done |
-| *proposal* | CFG data model + HLL CFG builder on top of the IR reader, checked against the Part 2 expected CFGs | [B3] |
+| 4 | HLL CFG generator: CFG data model, normalized operations, JSON/NetworkX/Graphviz ([`HLL_CFG.md`](HLL_CFG.md)) | Done |
 | *proposal* | Assembly reader + first ISA plug-in + ASM CFG builder | [A1]–[A5] |
 | *proposal* | Normalization N1–N6 + rule log | [C5] |
 | *proposal* | Matcher L0–L2 + diagnosis + verdict + JSON/Markdown report + SVG diagrams | [C1], [C3], [D1] |

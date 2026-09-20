@@ -6,3 +6,4 @@ networkx==3.6.1      # graph data structures and algorithms (dominators, isomorp
 pydot==4.0.1         # reads DOT files (for example LLVM's dot-cfg output) into Python
 graphviz==0.21       # builds and renders DOT diagrams from Python (needs the `dot` binary)
 pytest==9.1.1        # test runner
+jsonschema==4.26.0   # validates the CFG JSON files against src/cfgverify/model/cfg.schema.json (Part 4)

@@ -19,6 +19,7 @@ has already produced.
 | **Part 1**: development environment, C → LLVM IR checkpoint | Done. See below and [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md) |
 | **Part 2**: C/HLL control-flow fundamentals + regression programs | Done. See [`docs/CONTROL_FLOW_FUNDAMENTALS.md`](docs/CONTROL_FLOW_FUNDAMENTALS.md) and [`regression/`](regression) |
 | **Part 3**: LLVM IR generation and parsing (IR reader) | Done. See [`docs/LLVM_IR_GUIDE.md`](docs/LLVM_IR_GUIDE.md) |
+| **Part 4**: HLL CFG generator (JSON, NetworkX, Graphviz) | Done. See [`docs/HLL_CFG.md`](docs/HLL_CFG.md) |
 | Later parts | Not started. Roadmap in ARCHITECTURE §12 |
 
 > The target assembly architecture is **not yet decided** (TO CONFIRM WITH PROFESSOR). Nothing in this repo assumes
@@ -73,6 +74,15 @@ It compiles each file to LLVM IR and prints every function's blocks, terminators
 cross-checks the result against LLVM itself, then runs the reader tests, including 100 random C programs per mode.
 It ends with `CHECKPOINT PART 3 PASSED`. This takes a few minutes.
 
+### 7. Run the Part 4 checkpoint
+```bash
+bash scripts/setup_wsl.sh                        # once, to install jsonschema (added in Part 4)
+bash scripts/checkpoint_part4.sh                 # all C files in the repo
+bash scripts/checkpoint_part4.sh my_program.c    # or your own files
+```
+It builds an HLL CFG for every function (JSON, SVG and an HTML gallery in `build/part4/`) and checks each one.
+It ends with `CHECKPOINT PART 4 PASSED`. Open the gallery with `explorer.exe build/part4/index.html`.
+
 ---
 
 ## Commands
@@ -84,7 +94,8 @@ It ends with `CHECKPOINT PART 3 PASSED`. This takes a few minutes.
 | `cfgverify llvm-cfg FILE.ll [-o DIR]` | LLVM's own per-function CFG (`opt -passes=dot-cfg`) → DOT + SVG + a networkx summary |
 | `cfgverify expected-cfgs [--check]` | Part 2: redraws `docs/cfg/*.svg` from `regression/expected/*.toml` and refreshes the generated parts of the study doc |
 | `cfgverify parse-ir FILE.c\|FILE.ll [-g] [-i] [-f FN] [--json OUT] [--crosscheck]` | Part 3: blocks, instructions, terminators, successors, predecessors and edges of every function. `--crosscheck` compares them with LLVM |
-| `make test` / `pytest` | All tests: environment, C → IR, Part 2 regression CFGs, Part 3 IR reader (about 1–2 minutes) |
+| `cfgverify hll-cfg FILE... [-o DIR] [--detail ops\|ir\|none] [--check]` | Part 4: HLL CFG per function → `DIR/<file>.<fn>.cfg.json` + `.svg` + `index.html`. `--check` validates each one |
+| `make test` / `pytest` | All tests: environment, C → IR, Part 2 regression CFGs, Part 3 IR reader, Part 4 HLL CFGs (about 2–3 minutes) |
 
 `python -m cfgverify ...` works the same way as `cfgverify ...`.
 
@@ -92,14 +103,15 @@ It ends with `CHECKPOINT PART 3 PASSED`. This takes a few minutes.
 
 ```
 docs/              ARCHITECTURE.md (Part 0), OPEN_QUESTIONS.md (for the professor), ENVIRONMENT.md (Part 1),
-                   CONTROL_FLOW_FUNDAMENTALS.md + cfg/*.svg (Part 2), LLVM_IR_GUIDE.md (Part 3)
-scripts/           setup_wsl.sh, checkpoint_part1.sh, check_part2.sh, checkpoint_part3.sh
+                   CONTROL_FLOW_FUNDAMENTALS.md + cfg/*.svg (Part 2), LLVM_IR_GUIDE.md (Part 3), HLL_CFG.md (Part 4)
+scripts/           setup_wsl.sh, checkpoint_part1.sh, check_part2.sh, checkpoint_part3.sh, checkpoint_part4.sh
 examples/c/        hello_cfg.c (smoke-test program), part3/ (Part 3 checkpoint inputs)
 regression/        c/*.c regression programs + expected/*.toml expected CFGs (Part 2)
 src/cfgverify/     the package; each module's docstring states its responsibility and status
   graph_utils.py   dominators, back edges, natural loops (Part 2)
   expected.py      load, draw and document expected CFGs (Part 2)
-  hll/             C → IR → HLL CFG        (frontend, llvm_view, ir_reader, ir_crosscheck implemented; cfg_builder is a stub)
+  model/           CFG data model: ops.py, cfg.py (+ cfg.schema.json), cfg_dot.py (Part 4)
+  hll/             C → IR → HLL CFG        (frontend, llvm_view, ir_reader, ir_crosscheck, ir_ops, cfg_builder, cfg_checks)
   asm/             assembly → ASM CFG      (stubs; blocked until the ISA is confirmed)
   normalize/ match/ report/ explain/      (stubs)
 tests/             pytest suite
