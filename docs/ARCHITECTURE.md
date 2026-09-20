@@ -34,7 +34,7 @@ the same shape. This project automates that comparison:
 
 | # | Rule | How the design enforces it |
 |---|------|---------------------------|
-| R1 | Do not assume x86-64 unless the professor confirms it. | Everything that depends on the ISA sits behind an **ISA plug-in interface** (§7.3). No ISA plug-in is written until **[A1]/[A2]** are answered. |
+| R1 | Do not assume x86-64 unless the professor confirms it. | Everything that depends on the ISA sits behind an **ISA plug-in interface** (§7.3). Part 5 implements three *candidate* plug-ins (x86-64 AT&T/Intel, AArch64, RISC-V); **none of them is a default**, the reader and the CFG builder contain no ISA knowledge, and `--isa` must be given on every run. **[A1]/[A2]** remain open. |
 | R2 | Do not assume an assembly architecture or toolchain unless it is confirmed. | The assembly producer, the syntax and the ABI are open questions **[A2]–[A5]**. The IR target triple is a parameter, not a constant (§7.1). |
 | R3 | Do not invent requirements. | Proposals are labelled *design choice* or *proposal*. Open items are labelled **TO CONFIRM WITH PROFESSOR**. |
 | R4 | The deterministic CFG analysis and matcher are the verification authority. | The verdict is computed only in `match/` and `report/verdict.py`. The AI module has no write access to the verdict (§7.8). |
@@ -270,11 +270,16 @@ btp-cfg-verifier/
     │   ├── cfg_builder.py    IR function → HLL CFG (nodes, edges, branch info, analysis)  [Part 4]
     │   └── cfg_checks.py     Schema, round trips, invariants, agreement with LLVM         [Part 4]
     ├── asm/
-    │   ├── reader.py         Assembly text → labels/directives/instructions    [stub]
-    │   ├── cfg_builder.py    Leader algorithm → ASM CFG                        [stub]
+    │   ├── reader.py         Assembly text → labels/directives/instructions (ISA-neutral)  [Part 5]
+    │   ├── cfg_builder.py    Leader algorithm → ASM CFG (nodes, edges, branch info)        [Part 5]
+    │   ├── cfg_checks.py     Schema, round trips, invariants, compiler block marks,
+    │   │                     the assembler, branch-target resolution                       [Part 5]
     │   └── isa/
-    │       ├── base.py       ISA plug-in contract (what an ISA must describe)  [stub]
-    │       └── __init__.py   ISA registry; no ISA registered until [A1] is answered
+    │       ├── base.py       ISA plug-in contract (what an ISA must describe)              [Part 5]
+    │       ├── x86.py        CANDIDATE: x86-64, AT&T and Intel syntax                      [Part 5]
+    │       ├── aarch64.py    CANDIDATE: AArch64                                            [Part 5]
+    │       ├── riscv.py      CANDIDATE: RISC-V                                             [Part 5]
+    │       └── __init__.py   ISA registry + detection. NO DEFAULT ISA: [A1]/[A2] still open
     ├── normalize/rules.py    Normalization rules N1–N7                         [stub]
     ├── match/
     │   ├── invariants.py     Cheap structural fingerprints                     [stub]
@@ -354,7 +359,19 @@ and nothing from `explain/`.
   - 64-bit compares on 32-bit targets, which split into several branches;
 - later: condition-code semantics, needed for polarity checks (§7.5, L4).
 
-No ISA plug-in is written before **[A1]/[A2]** are answered (rule R1).
+**Status: implemented in Part 5** — see [`ASM_CFG.md`](ASM_CFG.md). The ISA-neutral reader and leader algorithm
+above are `asm/reader.py` and `asm/cfg_builder.py`; the plug-in contract is `asm/isa/base.py`, and three
+**candidate** plug-ins exist (`x86.py` for AT&T and Intel, `aarch64.py`, `riscv.py`). Building candidates rather
+than committing to one is how rule R1 is honoured: no ISA is the default, `--isa` is required on every run
+(`--isa auto` detects and *prints* its decision together with the scores), and every CFG records
+`meta.architecture_status = "TO CONFIRM WITH PROFESSOR ([A1], [A2]); this ISA was selected explicitly"`.
+When **[A1]/[A2]** are answered, the confirmed plug-in stays and the others simply stop being exercised; a new
+architecture is one new file of tables and no change anywhere else.
+
+Two shared-model consequences of reading assembly (Part 5): a new normalized operation **`MOVE`** (assembly has
+register-to-register copies; LLVM IR in SSA form does not), and the invariant "the last operation of a block is a
+terminator" is now HLL-only, because an assembly block can end merely because the next instruction is a branch
+target.
 
 ### 7.4 Normalization (`normalize/rules.py`)
 All rules are **semantics-preserving for control flow**, applied **identically to both CFGs** until nothing changes,
@@ -497,7 +514,7 @@ defined yet. They are for discussion and are not requirements.
 | 2 | C/HLL control-flow fundamentals + regression programs ([`CONTROL_FLOW_FUNDAMENTALS.md`](CONTROL_FLOW_FUNDAMENTALS.md)) | Done |
 | 3 | LLVM IR generation and parsing: IR reader + cross-checks ([`LLVM_IR_GUIDE.md`](LLVM_IR_GUIDE.md)) | Done |
 | 4 | HLL CFG generator: CFG data model, normalized operations, JSON/NetworkX/Graphviz ([`HLL_CFG.md`](HLL_CFG.md)) | Done |
-| *proposal* | Assembly reader + first ISA plug-in + ASM CFG builder | [A1]–[A5] |
+| 5 | Assembly CFG generator: ISA-neutral reader, ISA plug-in contract, leader algorithm, 3 candidate ISAs ([`ASM_CFG.md`](ASM_CFG.md)) | Done. The ISA to *verify* is still [A1]/[A2] |
 | *proposal* | Normalization N1–N6 + rule log | [C5] |
 | *proposal* | Matcher L0–L2 + diagnosis + verdict + JSON/Markdown report + SVG diagrams | [C1], [C3], [D1] |
 | *proposal* | Mutation-based evaluation | [F1] |

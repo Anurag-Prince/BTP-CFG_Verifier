@@ -27,6 +27,7 @@ from dataclasses import asdict, dataclass
 OP_CLASSES = {
     "ALLOC": "reserve a stack slot (IR alloca)",
     "LOAD": "read memory",
+    "MOVE": "copy a value between registers or load a constant (assembly side)",
     "STORE": "write memory",
     "ARITH": "integer/float arithmetic or bitwise operation (kind: add, sub, mul, div, rem, and, or, xor, shl, shr, neg)",
     "CMP": "comparison producing a truth value (kind: eq, ne, lt, le, gt, ge + .s signed / .u unsigned / .f float)",

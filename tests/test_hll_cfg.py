@@ -192,7 +192,7 @@ def test_schema_rejects_malformed_documents():
         lambda d: d.pop("edges"),
         lambda d: d["nodes"][0].update(id="entry"),
         lambda d: d["edges"][0].update(kind="maybe"),
-        lambda d: d["nodes"][0]["operations"][0].update(op="MOVE"),
+        lambda d: d["nodes"][0]["operations"][0].update(op="SHUFFLE"),   # not in the vocabulary (ops.py)
         lambda d: d.update(schema="cfgverify.cfg/0"),
     ):
         bad = copy.deepcopy(good)

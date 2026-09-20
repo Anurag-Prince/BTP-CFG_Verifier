@@ -17,6 +17,10 @@ Part 4 command
     hll-cfg    C or .ll files -> one HLL CFG per function: JSON (schema cfgverify.cfg/1), Graphviz SVG,
                and an HTML gallery (--check: schema, round trips, invariants, agreement with LLVM)
 
+Part 5 command
+    asm-cfg    .s files -> one assembly CFG per function, in the same format. --isa is REQUIRED (or 'auto',
+               which prints what it detected): the verified architecture is TO CONFIRM WITH PROFESSOR
+
 Later parts add `verify <file.c> <file.s>` (pipeline.py). It is not available yet.
 """
 
@@ -261,6 +265,63 @@ def _cmd_hll_cfg(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_asm_cfg(args: argparse.Namespace) -> int:
+    from cfgverify.asm import cfg_builder, cfg_checks, isa as isa_registry
+    from cfgverify.asm.reader import read_asm
+    from cfgverify.model import cfg_dot
+
+    out = Path(args.out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    gallery, failures, total = [], 0, 0
+    print(f"{'file':<26}{'isa':<16}{'function':<20}{'blocks':>7}{'edges':>7}{'dec':>5}{'loops':>7}{'back':>6}  "
+          f"{'check':<6}notes")
+    for source in args.inputs:
+        source = Path(source)
+        try:
+            asm = read_asm(source, args.isa)
+        except (isa_registry.UnknownIsa, OSError) as exc:
+            print(f"ERROR: {source}: {exc}", file=sys.stderr)
+            return 1
+        if asm.detection:
+            ranked = ", ".join(f"{n}={v}" for n, v in sorted(asm.detection.items(), key=lambda kv: -kv[1]) if v)
+            print(f"  detected ISA for {source.name}: {asm.isa.name} ({ranked}). "
+                  f"The verified architecture is still TO CONFIRM WITH PROFESSOR.")
+        cfgs = cfg_builder.build_cfgs(asm, c_source=args.c_source)
+        results = cfg_checks.check_cfgs(cfgs, asm, source) if args.check else {}
+        for name in (args.function or list(cfgs)):
+            if name not in cfgs:
+                print(f"ERROR: {source}: no function {name!r}", file=sys.stderr)
+                return 1
+            cfg, total = cfgs[name], total + 1
+            base = f"{source.stem}.{asm.isa.name}.{name}"
+            (out / f"{base}.cfg.json").write_text(cfg.to_json())
+            if not args.no_svg:
+                cfg_dot.render(cfg, out / f"{base}.svg", detail=args.detail)
+            a = cfg.analysis
+            problems = results.get(name, [])
+            failures += bool(problems)
+            status = "-" if not args.check else ("FAIL" if problems else "ok")
+            notes = f"unsupported: {', '.join(a['unsupported'])}" if a["unsupported"] else ""
+            print(f"{source.name:<26}{asm.isa.name:<16}{name:<20}{a['blocks']:>7}{a['edges']:>7}"
+                  f"{a['decisions']:>5}{len(a['loops']):>7}{len(a['back_edges']):>6}  {status:<6}{notes}")
+            for p in problems:
+                print(f"    - {p}")
+            gallery.append({"program": f"{source.name} [{asm.isa.name}]", "function": name,
+                            "svg": f"{base}.svg", "json": f"{base}.cfg.json",
+                            "summary": f"{a['blocks']} blocks, {a['edges']} edges, {a['decisions']} decisions, "
+                                       f"{len(a['loops'])} loop(s), cyclomatic {a['cyclomatic']}"})
+    if not args.no_svg:
+        print(f"\n{total} CFG(s): JSON + SVG in {out}/, gallery {cfg_dot.write_gallery(gallery, out / 'index.html', 'Assembly CFGs')}")
+    else:
+        print(f"\n{total} CFG(s): JSON in {out}/")
+    if args.check:
+        if failures:
+            print(f"CHECK FAILED for {failures} function(s)")
+            return 2
+        print("Check: schema, round trips, invariants, compiler block annotations, assembler and branch targets all agree.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="cfgverify", description=__doc__.splitlines()[0])
     p.add_argument("--version", action="version", version=f"cfgverify {__version__}")
@@ -312,6 +373,21 @@ def build_parser() -> argparse.ArgumentParser:
     h.add_argument("--check", action="store_true",
                    help="validate schema, JSON/NetworkX round trips, invariants, agreement with LLVM dot-cfg")
     h.set_defaults(func=_cmd_hll_cfg)
+
+    a = sub.add_parser("asm-cfg", help="assembly files -> assembly CFG per function (JSON, SVG, HTML gallery)")
+    a.add_argument("inputs", nargs="+", help="assembly files (.s)")
+    a.add_argument("--isa", required=True,
+                   help="architecture: " + ", ".join(__import__("cfgverify.asm.isa", fromlist=["x"]).available())
+                        + ", or 'auto' (prints what it detected). REQUIRED: the target is TO CONFIRM [A1]")
+    a.add_argument("-o", "--out-dir", default=str(config.BUILD_DIR / "asm_cfg"), help="output directory")
+    a.add_argument("-f", "--function", action="append", help="only this function (repeatable)")
+    a.add_argument("--c-source", help="the C file this assembly came from, to show source lines")
+    a.add_argument("--detail", choices=["ops", "ir", "none"], default="ops",
+                   help="what the diagram shows in each node (ops = normalized, ir = raw instructions)")
+    a.add_argument("--no-svg", action="store_true", help="JSON only")
+    a.add_argument("--check", action="store_true",
+                   help="schema, round trips, invariants, compiler block annotations, assembler, branch targets")
+    a.set_defaults(func=_cmd_asm_cfg)
     return p
 
 

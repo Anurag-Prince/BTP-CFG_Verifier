@@ -20,10 +20,13 @@ has already produced.
 | **Part 2**: C/HLL control-flow fundamentals + regression programs | Done. See [`docs/CONTROL_FLOW_FUNDAMENTALS.md`](docs/CONTROL_FLOW_FUNDAMENTALS.md) and [`regression/`](regression) |
 | **Part 3**: LLVM IR generation and parsing (IR reader) | Done. See [`docs/LLVM_IR_GUIDE.md`](docs/LLVM_IR_GUIDE.md) |
 | **Part 4**: HLL CFG generator (JSON, NetworkX, Graphviz) | Done. See [`docs/HLL_CFG.md`](docs/HLL_CFG.md) |
+| **Part 5**: Assembly CFG generator (ISA-neutral reader + ISA plug-ins) | Done. See [`docs/ASM_CFG.md`](docs/ASM_CFG.md) |
 | Later parts | Not started. Roadmap in ARCHITECTURE §12 |
 
 > The target assembly architecture is **not yet decided** (TO CONFIRM WITH PROFESSOR). Nothing in this repo assumes
-> x86-64. The host's default target triple is used only to generate IR for the Part 1 smoke test.
+> x86-64. The host's default target triple is used only to generate IR for the Part 1 smoke test. Part 5 ships
+> three *candidate* ISA plug-ins — x86-64 (AT&T and Intel), AArch64 and RISC-V — with **no default**: `--isa` must
+> be given on every `asm-cfg` run. A candidate is not a decision; see [A1]/[A2] in `docs/OPEN_QUESTIONS.md`.
 
 ---
 
@@ -83,6 +86,17 @@ bash scripts/checkpoint_part4.sh my_program.c    # or your own files
 It builds an HLL CFG for every function (JSON, SVG and an HTML gallery in `build/part4/`) and checks each one.
 It ends with `CHECKPOINT PART 4 PASSED`. Open the gallery with `explorer.exe build/part4/index.html`.
 
+### 8. Run the Part 5 checkpoint
+```bash
+bash scripts/checkpoint_part5.sh                 # all C files in the repo, every candidate ISA
+bash scripts/checkpoint_part5.sh my_program.c    # or your own files
+```
+It compiles every program to **x86-64, AArch64 and RISC-V** assembly (plus GCC output and Intel syntax), reads the
+three hand-written files in `regression/asm/` with `--isa auto`, and builds a CFG for each with the *same*
+generator — only the `--isa` argument changes. Each CFG is checked against the compiler's own machine-block
+marks, the assembler and the C it came from. It ends with `CHECKPOINT PART 5 PASSED` and a reminder that the
+architecture to verify is still TO CONFIRM WITH PROFESSOR. Gallery: `explorer.exe build/part5/index.html`.
+
 ---
 
 ## Commands
@@ -95,7 +109,8 @@ It ends with `CHECKPOINT PART 4 PASSED`. Open the gallery with `explorer.exe bui
 | `cfgverify expected-cfgs [--check]` | Part 2: redraws `docs/cfg/*.svg` from `regression/expected/*.toml` and refreshes the generated parts of the study doc |
 | `cfgverify parse-ir FILE.c\|FILE.ll [-g] [-i] [-f FN] [--json OUT] [--crosscheck]` | Part 3: blocks, instructions, terminators, successors, predecessors and edges of every function. `--crosscheck` compares them with LLVM |
 | `cfgverify hll-cfg FILE... [-o DIR] [--detail ops\|ir\|none] [--check]` | Part 4: HLL CFG per function → `DIR/<file>.<fn>.cfg.json` + `.svg` + `index.html`. `--check` validates each one |
-| `make test` / `pytest` | All tests: environment, C → IR, Part 2 regression CFGs, Part 3 IR reader, Part 4 HLL CFGs (about 2–3 minutes) |
+| `cfgverify asm-cfg FILE.s... --isa ISA\|auto [-o DIR] [--c-source F.c] [--check]` | Part 5: assembly CFG per function → `DIR/<file>.<isa>.<fn>.cfg.json` + `.svg` + `index.html`. **`--isa` is required** (`auto` detects and prints its decision) |
+| `make test` / `pytest` | All tests: environment, C → IR, Part 2 regression CFGs, Part 3 IR reader, Part 4 HLL CFGs, Part 5 assembly CFGs (about 3 minutes) |
 
 `python -m cfgverify ...` works the same way as `cfgverify ...`.
 
@@ -103,16 +118,19 @@ It ends with `CHECKPOINT PART 4 PASSED`. Open the gallery with `explorer.exe bui
 
 ```
 docs/              ARCHITECTURE.md (Part 0), OPEN_QUESTIONS.md (for the professor), ENVIRONMENT.md (Part 1),
-                   CONTROL_FLOW_FUNDAMENTALS.md + cfg/*.svg (Part 2), LLVM_IR_GUIDE.md (Part 3), HLL_CFG.md (Part 4)
-scripts/           setup_wsl.sh, checkpoint_part1.sh, check_part2.sh, checkpoint_part3.sh, checkpoint_part4.sh
+                   CONTROL_FLOW_FUNDAMENTALS.md + cfg/*.svg (Part 2), LLVM_IR_GUIDE.md (Part 3), HLL_CFG.md (Part 4),
+                   ASM_CFG.md (Part 5)
+scripts/           setup_wsl.sh, checkpoint_part1.sh, check_part2.sh, checkpoint_part3.sh, checkpoint_part4.sh,
+                   checkpoint_part5.sh
 examples/c/        hello_cfg.c (smoke-test program), part3/ (Part 3 checkpoint inputs)
-regression/        c/*.c regression programs + expected/*.toml expected CFGs (Part 2)
+regression/        c/*.c regression programs + expected/*.toml expected CFGs (Part 2),
+                   asm/*.s hand-written assembly with no compiler directives (Part 5)
 src/cfgverify/     the package; each module's docstring states its responsibility and status
   graph_utils.py   dominators, back edges, natural loops (Part 2)
   expected.py      load, draw and document expected CFGs (Part 2)
   model/           CFG data model: ops.py, cfg.py (+ cfg.schema.json), cfg_dot.py (Part 4)
   hll/             C → IR → HLL CFG        (frontend, llvm_view, ir_reader, ir_crosscheck, ir_ops, cfg_builder, cfg_checks)
-  asm/             assembly → ASM CFG      (stubs; blocked until the ISA is confirmed)
+  asm/             assembly → ASM CFG      (reader, cfg_builder, cfg_checks, isa/ plug-ins; Part 5)
   normalize/ match/ report/ explain/      (stubs)
 tests/             pytest suite
 build/             generated output (git-ignored)

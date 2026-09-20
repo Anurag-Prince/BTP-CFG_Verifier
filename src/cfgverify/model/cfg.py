@@ -197,8 +197,10 @@ class CFG:
                 problems.append(f"{n.id}: an exit node has successors")
             if n.terminator == "cond_br" and [e.kind for e in outs] != ["T", "F"]:
                 problems.append(f"{n.id}: a 2-way branch must have edges T then F")
-            if n.operations and n.operations[-1].op not in ("JUMP", "BRANCH", "SWITCH", "RETURN", "UNREACHABLE",
-                                                             "INDIRECT"):
+            if self.origin == "hll" and n.operations and n.operations[-1].op not in (
+                    "JUMP", "BRANCH", "SWITCH", "RETURN", "UNREACHABLE", "INDIRECT"):
+                # In assembly a block can end simply because the next instruction is a branch target,
+                # so its last instruction is an ordinary one (a fall-through block).
                 problems.append(f"{n.id}: last operation is not a terminator")
         if self.node(self.entry).predecessors and self.origin == "hll":
             problems.append("the LLVM entry block must not have predecessors")

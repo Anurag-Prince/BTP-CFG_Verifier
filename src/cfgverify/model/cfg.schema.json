@@ -17,6 +17,9 @@
       "description": "Where the CFG came from: files, target triple, producer, lines.",
       "properties": {
         "c_file": {"type": ["string", "null"]},
+        "asm_file": {"type": ["string", "null"]},
+        "isa": {"type": ["string", "null"], "description": "assembly side only; the architecture is TO CONFIRM, so it is always recorded"},
+        "syntax": {"type": ["string", "null"]},
         "ir_file": {"type": ["string", "null"]},
         "target_triple": {"type": ["string", "null"]},
         "ir_line": {"type": ["integer", "null"]},
@@ -61,7 +64,7 @@
       "required": ["op", "kind", "result", "operands", "text", "source_line"],
       "additionalProperties": false,
       "properties": {
-        "op": {"enum": ["ALLOC", "LOAD", "STORE", "ARITH", "CMP", "CAST", "ADDR", "CALL", "PHI", "SELECT",
+        "op": {"enum": ["ALLOC", "LOAD", "MOVE", "STORE", "ARITH", "CMP", "CAST", "ADDR", "CALL", "PHI", "SELECT",
                         "JUMP", "BRANCH", "SWITCH", "RETURN", "UNREACHABLE", "INDIRECT", "OTHER"]},
         "kind": {"type": ["string", "null"]},
         "result": {"type": ["string", "null"]},
