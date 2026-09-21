@@ -35,11 +35,11 @@ Suggested order for the first meeting: **A1, A3, A4, C1**. These four decide mos
 
 | ID | Question | Why it matters | Until confirmed | Status |
 |---|---|---|---|---|
-| C1 | **Which level of consistency is required?** (a) normalized CFG isomorphism per function; (b) (a) + loop structure; (c) (b) + branch polarity (true/false arms map correctly); (d) (c) + branch condition equivalence. | This is the core definition of the project. Structure alone cannot detect swapped `if` arms when both arms have the same shape (ARCHITECTURE §10). | Design supports (a)–(b) first, with (c) as a planned extension. | OPEN |
+| C1 | **Which level of consistency is required?** (a) normalized CFG isomorphism per function; (b) (a) + loop structure; (c) (b) + branch polarity (true/false arms map correctly); (d) (c) + branch condition equivalence. | This is the core definition of the project. Structure alone cannot detect swapped `if` arms when both arms have the same shape (ARCHITECTURE §10). | Part 7 implements (a)-(c) by default and (d) behind `--require-conditions`; branch-condition disagreements are reported either way, as warnings or as errors. | OPEN |
 | C2 | **Per-function (intraprocedural) CFG only**, or is interprocedural flow (call graph, call order) also in scope? | Scope of the model and the matcher. | Per function; calls are ordinary instructions. | OPEN |
-| C3 | Must the output be strictly **MATCH/MISMATCH**, or may the tool answer **UNSUPPORTED** when input is outside the subset? | Avoids forced guesses, since a false MATCH is the worst possible error. | Proposed: yes, UNSUPPORTED is allowed. | OPEN |
+| C3 | Must the output be strictly **MATCH/MISMATCH**, or may the tool answer **UNSUPPORTED** when input is outside the subset? | Avoids forced guesses, since a false MATCH is the worst possible error. | Part 7 answers UNSUPPORTED by default and MISMATCH under `--strict`; the construct is always named in a finding. | OPEN |
 | C4 | Verdict **per program only**, or **per function** as well? | Report design. | Both (per function, then aggregated). | OPEN |
-| C5 | **Approve the normalization rules** N1–N8 (ARCHITECTURE §7.4). Are any of them considered "too forgiving"? | Normalization decides what counts as an irrelevant difference. | N1–N6 as proposed; N7 in Phase B; N8 only if the assembly producer folds constant conditions. | OPEN |
+| C5 | **Approve or modify the normalization rules** N1–N8, and the semantic operation vocabulary (the brief's 14 categories plus the 13 extensions in `NORMALIZATION.md` §1). Should a constant-propagation rule **N9** be added (finding F2: Clang keeps `do { } while (1)` as a branch on a register holding 1)? | Normalization decides what counts as the same control flow, so every later verdict depends on it. | N1–N8 as implemented in Part 6, each one switchable and logged; the extension categories are marked as extensions everywhere. | OPEN |
 
 ## D. Interface and outputs
 

@@ -1,6 +1,6 @@
 # Architecture: C/HLL ↔ Assembly Control-Flow Consistency Verifier
 
-> **Status:** Part 0 design, draft v0.1 (2026-09-20). Parts 1–4 are done; see §12.
+> **Status:** Part 0 design, draft v0.1 (2026-09-20). Parts 1–7 are done; see §12.
 > Anything marked **TO CONFIRM WITH PROFESSOR** is still open. Every open item is collected in
 > [`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md), and this document refers to them by ID (for example **[A1]**).
 > Anything labelled *design choice* is our own engineering decision. It can be changed and is **not** a requirement from the professor.
@@ -260,7 +260,7 @@ btp-cfg-verifier/
     │   ├── cfg.py            CFG / Node / Edge / BranchInfo, analysis, JSON, NetworkX     [Part 4]
     │   ├── cfg.schema.json   JSON Schema "cfgverify.cfg/1"                                [Part 4]
     │   ├── cfg_dot.py        Graphviz rendering + HTML gallery                            [Part 4]
-    │   └── evidence.py       Finding, NormalizationStep, Mapping, Verdict       [stub]
+    │   └── evidence.py       Finding, Mapping, FunctionResult, Verdict             [Part 7]
     ├── hll/
     │   ├── frontend.py       C → LLVM IR using Clang with canonical flags       [Part 1]
     │   ├── llvm_view.py      LLVM's own CFG (opt dot-cfg), used as a reference oracle   [Part 1]
@@ -280,14 +280,20 @@ btp-cfg-verifier/
     │       ├── aarch64.py    CANDIDATE: AArch64                                            [Part 5]
     │       ├── riscv.py      CANDIDATE: RISC-V                                             [Part 5]
     │       └── __init__.py   ISA registry + detection. NO DEFAULT ISA: [A1]/[A2] still open
-    ├── normalize/rules.py    Normalization rules N1–N7                         [stub]
+    ├── normalize/
+    │   ├── semantics.py      Instruction -> semantic category (the brief's vocabulary)  [Part 6]
+    │   ├── conditions.py     Branch condition -> comparable form (relation, shape, polarity)  [Part 6]
+    │   ├── loops.py          Loop nest -> comparable signature, with no block names   [Part 6]
+    │   ├── rules.py          Normalization rules N1-N8 + replayable rule log          [Part 6]
+    │   └── checks.py         Proof that meaning survived normalization (P1-P6)        [Part 6]
     ├── match/
-    │   ├── invariants.py     Cheap structural fingerprints                     [stub]
-    │   ├── matcher.py        Function pairing + isomorphism + mapping          [stub]
-    │   └── diagnose.py       Localize and classify mismatches                  [stub]
+    │   ├── invariants.py     L1 fingerprints + the name-free block role            [Part 7]
+    │   ├── matcher.py        L0 pairing, L2/L3 isomorphism, partial mapping, L4    [Part 7]
+    │   ├── diagnose.py       Localize and classify mismatches into findings        [Part 7]
+    │   └── __init__.py       verify(): the whole pipeline in one call              [Part 7]
     ├── report/
-    │   ├── verdict.py        The only place a verdict is decided               [stub]
-    │   └── render.py         JSON/Markdown reports, DOT/SVG diagrams           [stub]
+    │   ├── verdict.py        THE ONLY PLACE A VERDICT IS DECIDED (rule R4)         [Part 7]
+    │   └── render.py         Terminal summary + Markdown report + JSON evidence    [Part 7]
     └── explain/explainer.py  AI explanation with guardrails                    [stub]
 ```
 
@@ -386,7 +392,19 @@ and **logged** (`NormalizationStep` records go into the evidence). *Proposal, to
 | N5 Degenerate branch | A conditional branch with both targets equal becomes a jump. | Equivalent encodings |
 | N6 Polarity-free edges (stage 1) | Conditional edges are compared as an unordered pair at first. | Compilers invert conditions (see §3.11) |
 | N7 Noreturn sink | Blocks ending in `unreachable` or a known noreturn call go to a TRAP sink. | `exit()`/`abort()` handling (Phase B, **[B3]**) |
-| N8 Constant-condition branch | `br i1 true/false` becomes an unconditional jump to the live target. | `do … while (1)` gives `br i1 true` in Clang `-O0` IR (Part 3, P1). Needed only if the assembly producer folds the constant (**[A3]**). |
+| N8 Constant-condition branch | `br i1 true/false` becomes an unconditional jump to the live target. | `do … while (1)` gives `br i1 true` in Clang `-O0` IR (Part 3, P1) and a plain `jmp` in GCC's assembly. |
+
+**Status: implemented in Part 6** — see [`NORMALIZATION.md`](NORMALIZATION.md). All eight rules run to a
+fixpoint, on **both** CFGs with one implementation (`normalize/rules.py` never reads `cfg.origin`, the ISA or
+a file name, and a test asserts that from the source), and every application is logged as a
+`NormalizationStep` with the raw blocks behind it. N6 is implemented as an annotation rather than a rewrite:
+each conditional edge carries its comparable `condition_key` and the `polarity_free_key` that ignores which
+arm the compiler chose. Part 6 also added the layer the rules work in: **semantic operations**
+(`normalize/semantics.py` — ASSIGN, ADD, COMPARE, CONDITIONAL_BRANCH, …), **comparable branch conditions**
+(`normalize/conditions.py`) and **comparable loop signatures** (`normalize/loops.py`).
+`normalize/checks.py` proves per run that the rewriting kept the control-flow meaning (properties P1–P6).
+A possible **N9** (constant propagation) is recorded as finding F2 in NORMALIZATION.md §6, and the whole rule
+set remains a proposal under **[C5]**.
 
 N6 is a known weakness, because it hides swapped branch arms. See §10 and L4.
 
@@ -405,6 +423,17 @@ N6 is a known weakness, because it hides swapped branch arms. See §10 and L4.
    `icmp sgt`) and the assembly condition (for example `jle` after `cmp`), and check that true/false edges map to the
    correct taken/fall-through edges. Whether L4 is required depends on what "consistent" means **[C1]**.
 
+**Status: implemented in Part 7** — see [`MATCHING.md`](MATCHING.md). Three corrections the design needed, each
+found by running the matcher against real compiler output, and each one a false-MISMATCH source if ignored:
+L2 must **not** require `T` to map to `T` (compilers invert a test and swap the arms; the polarity-free key of
+rule N6 is what makes AArch64 and RISC-V match at all), must **not** fold the branch condition into the
+structural test (a compiler may emit `x >= 2` for `x > 1`), and L3 must compare block content by
+**containment as a tie-breaker**, never by equality — the assembly always does more work than the IR.
+L4 runs and reports; whether its findings are errors is the `--require-conditions` switch, i.e. **[C1]**.
+When the graphs are not isomorphic, `match/matcher.py:partial_mapping()` still produces a mapping by colour
+refinement, content anchors and growth, so `match/diagnose.py` can localize the difference instead of
+declaring every block missing.
+
 ### 7.6 Mismatch detection and evidence (`match/diagnose.py`, `model/evidence.py`)
 Every finding has an ID, a kind, a function, the HLL nodes, the assembly nodes, the assembly line range, C source lines
 (if available) and a deterministic one-line description. Proposed kinds:
@@ -419,6 +448,12 @@ Every finding has an ID, a kind, a function, the HLL nodes, the assembly nodes, 
 | `UNMAPPED_REGION` | The smallest HLL subgraph with no assembly counterpart (from the maximum common subgraph) |
 | `POLARITY` (L4) | The branch arms appear to be swapped |
 | `UNSUPPORTED_CONSTRUCT` | Indirect jump, jump table, inline asm, … |
+
+**Status: implemented in Part 7.** The finding vocabulary is now `model/evidence.py`, and it is the ten kinds
+the brief names (`MISSING_BLOCK`, `EXTRA_BLOCK`, `MISSING_EDGE`, `EXTRA_EDGE`, `WRONG_BRANCH`,
+`WRONG_BRANCH_CONDITION`, `MISSING_LOOP_BACK_EDGE`, `UNEXPECTED_PATH`, `MISSING_RETURN`,
+`STRUCTURAL_MISMATCH`) plus `FUNCTION_MISSING`/`FUNCTION_EXTRA` **[B4]**, `UNSUPPORTED_CONSTRUCT` **[C3]**
+and `AMBIGUOUS_MAPPING`. Every kind is produced from real inputs by the mutation tests; none is theoretical.
 
 ### 7.7 Verdict (`report/verdict.py`)
 - **MATCH:** every paired function passes L1 and L2 (and L4, if **[C1]** requires it), and there are no
@@ -515,8 +550,8 @@ defined yet. They are for discussion and are not requirements.
 | 3 | LLVM IR generation and parsing: IR reader + cross-checks ([`LLVM_IR_GUIDE.md`](LLVM_IR_GUIDE.md)) | Done |
 | 4 | HLL CFG generator: CFG data model, normalized operations, JSON/NetworkX/Graphviz ([`HLL_CFG.md`](HLL_CFG.md)) | Done |
 | 5 | Assembly CFG generator: ISA-neutral reader, ISA plug-in contract, leader algorithm, 3 candidate ISAs ([`ASM_CFG.md`](ASM_CFG.md)) | Done. The ISA to *verify* is still [A1]/[A2] |
-| *proposal* | Normalization N1–N6 + rule log | [C5] |
-| *proposal* | Matcher L0–L2 + diagnosis + verdict + JSON/Markdown report + SVG diagrams | [C1], [C3], [D1] |
+| 6 | CFG normalization: semantic operations, comparable conditions and loops, rules N1-N8 + rule log ([`NORMALIZATION.md`](NORMALIZATION.md)) | Done. The rule set is still a proposal, [C5] |
+| 7 | CFG matching and verification: L0-L4, located findings, verdict, reports ([`MATCHING.md`](MATCHING.md)) | Done. What "consistent" means is still [C1] |
 | *proposal* | Mutation-based evaluation | [F1] |
 | *proposal* | AI explanation with guardrails | [E1] |
 | *proposal* | More constructs (`&&`/`||`, `?:`, switch, goto, noreturn), L3 anchors, L4 polarity | [B3], [C1] |

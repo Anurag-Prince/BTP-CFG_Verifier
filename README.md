@@ -21,6 +21,8 @@ has already produced.
 | **Part 3**: LLVM IR generation and parsing (IR reader) | Done. See [`docs/LLVM_IR_GUIDE.md`](docs/LLVM_IR_GUIDE.md) |
 | **Part 4**: HLL CFG generator (JSON, NetworkX, Graphviz) | Done. See [`docs/HLL_CFG.md`](docs/HLL_CFG.md) |
 | **Part 5**: Assembly CFG generator (ISA-neutral reader + ISA plug-ins) | Done. See [`docs/ASM_CFG.md`](docs/ASM_CFG.md) |
+| **Part 6**: CFG normalization (semantic operations, rules N1-N8) | Done. See [`docs/NORMALIZATION.md`](docs/NORMALIZATION.md) |
+| **Part 7**: CFG matching and verification (MATCH/MISMATCH + evidence) | Done. See [`docs/MATCHING.md`](docs/MATCHING.md) |
 | Later parts | Not started. Roadmap in ARCHITECTURE §12 |
 
 > The target assembly architecture is **not yet decided** (TO CONFIRM WITH PROFESSOR). Nothing in this repo assumes
@@ -97,6 +99,27 @@ generator — only the `--isa` argument changes. Each CFG is checked against the
 marks, the assembler and the C it came from. It ends with `CHECKPOINT PART 5 PASSED` and a reminder that the
 architecture to verify is still TO CONFIRM WITH PROFESSOR. Gallery: `explorer.exe build/part5/index.html`.
 
+### 9. Run the Part 6 checkpoint
+```bash
+bash scripts/checkpoint_part6.sh                 # all C files in the repo, both sides
+bash scripts/checkpoint_part6.sh my_program.c    # or your own files
+```
+It builds every raw CFG (HLL and assembly, three candidate ISAs), normalizes them all with the *same* rules,
+and proves for each one that the rewriting kept the control-flow meaning — what every path computes, which
+code can repeat, the decisions and their conditions, reachability, dominance and provenance. It ends with
+`CHECKPOINT PART 6 PASSED` and a table showing how much closer the two sides get.
+
+### 10. Run the Part 7 checkpoint — the verifier itself
+```bash
+bash scripts/checkpoint_part7.sh                 # all C files in the repo, every candidate ISA
+cfgverify verify my_program.c my_program.s --isa x86-64 -o build/report
+```
+It verifies every program against its own assembly on three architectures (expect MATCH), then deliberately
+breaks the assembly — a branch sent to the wrong arm, a jump deleted, a `ret` removed, a loop's back edge
+redirected, a test changed, a function renamed — and requires each break to be caught **and located**.
+It also checks the opposite: a harmless edit must still be MATCH. Exit codes: 0 MATCH, 2 MISMATCH,
+3 UNSUPPORTED.
+
 ---
 
 ## Commands
@@ -110,7 +133,9 @@ architecture to verify is still TO CONFIRM WITH PROFESSOR. Gallery: `explorer.ex
 | `cfgverify parse-ir FILE.c\|FILE.ll [-g] [-i] [-f FN] [--json OUT] [--crosscheck]` | Part 3: blocks, instructions, terminators, successors, predecessors and edges of every function. `--crosscheck` compares them with LLVM |
 | `cfgverify hll-cfg FILE... [-o DIR] [--detail ops\|ir\|none] [--check]` | Part 4: HLL CFG per function → `DIR/<file>.<fn>.cfg.json` + `.svg` + `index.html`. `--check` validates each one |
 | `cfgverify asm-cfg FILE.s... --isa ISA\|auto [-o DIR] [--c-source F.c] [--check]` | Part 5: assembly CFG per function → `DIR/<file>.<isa>.<fn>.cfg.json` + `.svg` + `index.html`. **`--isa` is required** (`auto` detects and prints its decision) |
-| `make test` / `pytest` | All tests: environment, C → IR, Part 2 regression CFGs, Part 3 IR reader, Part 4 HLL CFGs, Part 5 assembly CFGs (about 3 minutes) |
+| `cfgverify normalize FILE.cfg.json... [-o DIR] [--rules N1,N2,...] [-v] [--check]` | Part 6: normalized CFG + rule log → `DIR/<name>.norm.cfg.json` + `.rules.json` + `.svg`. `--check` proves the meaning survived |
+| `cfgverify verify FILE.c FILE.s... --isa ISA [-o DIR] [--require-conditions] [--strict]` | Part 7: **MATCH / MISMATCH / UNSUPPORTED** with located findings, a Markdown report and a JSON evidence record |
+| `make test` / `pytest` | All tests: environment, C → IR, Parts 2-7 (about 4 minutes) |
 
 `python -m cfgverify ...` works the same way as `cfgverify ...`.
 
@@ -119,9 +144,9 @@ architecture to verify is still TO CONFIRM WITH PROFESSOR. Gallery: `explorer.ex
 ```
 docs/              ARCHITECTURE.md (Part 0), OPEN_QUESTIONS.md (for the professor), ENVIRONMENT.md (Part 1),
                    CONTROL_FLOW_FUNDAMENTALS.md + cfg/*.svg (Part 2), LLVM_IR_GUIDE.md (Part 3), HLL_CFG.md (Part 4),
-                   ASM_CFG.md (Part 5)
+                   ASM_CFG.md (Part 5), NORMALIZATION.md (Part 6), MATCHING.md (Part 7)
 scripts/           setup_wsl.sh, checkpoint_part1.sh, check_part2.sh, checkpoint_part3.sh, checkpoint_part4.sh,
-                   checkpoint_part5.sh
+                   checkpoint_part5.sh, checkpoint_part6.sh, checkpoint_part7.sh
 examples/c/        hello_cfg.c (smoke-test program), part3/ (Part 3 checkpoint inputs)
 regression/        c/*.c regression programs + expected/*.toml expected CFGs (Part 2),
                    asm/*.s hand-written assembly with no compiler directives (Part 5)
@@ -131,7 +156,10 @@ src/cfgverify/     the package; each module's docstring states its responsibilit
   model/           CFG data model: ops.py, cfg.py (+ cfg.schema.json), cfg_dot.py (Part 4)
   hll/             C → IR → HLL CFG        (frontend, llvm_view, ir_reader, ir_crosscheck, ir_ops, cfg_builder, cfg_checks)
   asm/             assembly → ASM CFG      (reader, cfg_builder, cfg_checks, isa/ plug-ins; Part 5)
-  normalize/ match/ report/ explain/      (stubs)
+  normalize/       semantic operations, comparable conditions/loops, rules N1-N8, checks (Part 6)
+  match/           L0-L4 matcher, localized findings (Part 7)
+  report/          the only place a verdict is decided, + Markdown/JSON reports (Part 7)
+  explain/         (stub: Part 8, the AI explanation layer)
 tests/             pytest suite
 build/             generated output (git-ignored)
 ```

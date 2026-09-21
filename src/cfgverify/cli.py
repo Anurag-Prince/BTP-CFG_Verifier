@@ -322,6 +322,116 @@ def _cmd_asm_cfg(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_normalize(args: argparse.Namespace) -> int:
+    """Part 6: raw CFG (either side) -> normalized CFG, with the rule log and the preservation proof."""
+    from cfgverify.model import cfg_dot
+    from cfgverify.model.cfg import CFG
+    from cfgverify.normalize import checks as norm_checks
+    from cfgverify.normalize import loops as loop_shapes
+    from cfgverify.normalize import normalize as run_rules
+    from cfgverify.normalize.rules import ALL_RULES, log_to_json
+
+    rules = tuple(r.strip().upper() for r in args.rules.split(",")) if args.rules else ALL_RULES
+    unknown = [r for r in rules if r not in ALL_RULES]
+    if unknown:
+        print(f"ERROR: unknown rule(s) {unknown}; available: {', '.join(ALL_RULES)}", file=sys.stderr)
+        return 1
+
+    out = Path(args.out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    gallery, failures, total = [], 0, 0
+    print(f"{'cfg':<40}{'side':<5}{'blocks':>13}{'edges':>13}{'dec':>9}{'loops':>7}{'steps':>7}  "
+          f"{'check':<6}rules")
+    for source in args.inputs:
+        source = Path(source)
+        try:
+            raw = CFG.from_json(source.read_text())
+        except (OSError, ValueError) as exc:
+            print(f"ERROR: {source}: {exc}", file=sys.stderr)
+            return 1
+        cfg, log = run_rules(raw, rules=rules)
+        total += 1
+        problems = []
+        if args.check:
+            problems = norm_checks.check_preserved(raw, cfg, log) + norm_checks.check_normalized(cfg)
+            failures += bool(problems)
+        s = norm_checks.summary(raw, cfg, log)
+        base = f"{source.name[:-len('.cfg.json')] if source.name.endswith('.cfg.json') else source.stem}.norm"
+        (out / f"{base}.cfg.json").write_text(cfg.to_json())
+        (out / f"{base}.rules.json").write_text(log_to_json(log))
+        if not args.no_svg:
+            cfg_dot.render(cfg, out / f"{base}.svg", detail=args.detail)
+        status = "-" if not args.check else ("FAIL" if problems else "ok")
+        shrink = lambda pair: f"{pair[0]} -> {pair[1]}"
+        print(f"{source.name[:39]:<40}{raw.origin:<5}{shrink(s['blocks']):>13}{shrink(s['edges']):>13}"
+              f"{shrink(s['decisions']):>9}{s['loops'][1]:>7}{s['steps']:>7}  "
+              f"{status:<6}{','.join(s['rules'])}")
+        if args.verbose:
+            for step in log:
+                print(f"      {step}")
+        for problem in problems:
+            print(f"    - {problem}")
+        gallery.append({"program": source.name, "function": f"{cfg.function} [{raw.origin}, normalized]",
+                        "svg": f"{base}.svg", "json": f"{base}.cfg.json",
+                        "summary": f"{s['blocks'][0]}->{s['blocks'][1]} blocks, "
+                                   f"{s['edges'][0]}->{s['edges'][1]} edges, "
+                                   f"{s['decisions'][1]} decisions, loops {loop_shapes.loop_signature(cfg)}, "
+                                   f"{s['steps']} rule step(s)"})
+    if not args.no_svg:
+        print(f"\n{total} normalized CFG(s): JSON + rule log + SVG in {out}/, "
+              f"gallery {cfg_dot.write_gallery(gallery, out / 'index.html', 'Normalized CFGs')}")
+    else:
+        print(f"\n{total} normalized CFG(s): JSON + rule log in {out}/")
+    if args.check:
+        if failures:
+            print(f"CHECK FAILED for {failures} CFG(s)")
+            return 2
+        print("Check: path semantics, loop nesting, decisions, reachability, dominance and provenance "
+              "all survived normalization (P1-P6).")
+    return 0
+
+
+def _cmd_verify(args: argparse.Namespace) -> int:
+    """Part 7: a C file and its assembly -> MATCH / MISMATCH / UNSUPPORTED, with located evidence."""
+    from cfgverify.asm import cfg_builder as asm_builder
+    from cfgverify.asm import isa as isa_registry
+    from cfgverify.hll import cfg_builder as hll_builder
+    from cfgverify.hll.frontend import FrontendError
+    from cfgverify.hll.ir_reader import IRParseError
+    from cfgverify.match import verify as run_verify
+    from cfgverify.report import render
+
+    out = Path(args.out_dir)
+    source = Path(args.c_source)
+    try:
+        hll = hll_builder.cfgs_from_file(source, ll_out=out / f"{source.stem}.ll" if source.suffix == ".c"
+                                         else None, target=args.target, debug_info=True)
+    except (FrontendError, IRParseError, OSError) as exc:
+        print(f"ERROR: {source}: {exc}", file=sys.stderr)
+        return 1
+
+    asm: dict = {}
+    for path in args.assembly:
+        try:
+            asm.update(asm_builder.cfgs_from_file(Path(path), args.isa, c_source=source))
+        except (isa_registry.UnknownIsa, OSError) as exc:
+            print(f"ERROR: {path}: {exc}", file=sys.stderr)
+            return 1
+
+    report = run_verify(hll, asm, level=args.level, require_conditions=args.require_conditions,
+                        allow_unsupported=not args.strict,
+                        meta={"c_file": str(source), "assembly": [str(p) for p in args.assembly],
+                              "isa": args.isa})
+    print(render.terminal(report, show_findings=not args.quiet, show_mapping=args.show_mapping))
+    if args.out_dir:
+        paths = render.write(report, out, stem=source.stem)
+        print(f"\nReport: {paths['markdown']}   Evidence: {paths['json']}")
+    return {"MATCH": 0, "UNSUPPORTED": 3}.get(report.verdict, 2)
+
+
+_MATCH_LEVELS = ("L1", "L2", "L3", "L4")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="cfgverify", description=__doc__.splitlines()[0])
     p.add_argument("--version", action="version", version=f"cfgverify {__version__}")
@@ -388,6 +498,38 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--check", action="store_true",
                    help="schema, round trips, invariants, compiler block annotations, assembler, branch targets")
     a.set_defaults(func=_cmd_asm_cfg)
+
+    n = sub.add_parser("normalize", help="Part 6: raw CFG JSON -> normalized CFG + rule log (both sides)")
+    n.add_argument("inputs", nargs="+", help="*.cfg.json files produced by hll-cfg or asm-cfg")
+    n.add_argument("-o", "--out-dir", default=str(config.BUILD_DIR / "normalized"), help="output directory")
+    n.add_argument("--rules", help="comma-separated subset of N1..N8 (default: all; the set is TO CONFIRM [C5])")
+    n.add_argument("--detail", choices=["ops", "ir", "none"], default="ops",
+                   help="what the diagram shows in each node (default: normalized operations)")
+    n.add_argument("--no-svg", action="store_true", help="JSON only")
+    n.add_argument("-v", "--verbose", action="store_true", help="print every rule step")
+    n.add_argument("--check", action="store_true",
+                   help="prove the rewriting preserved control-flow meaning (P1-P6)")
+    n.set_defaults(func=_cmd_normalize)
+
+    v = sub.add_parser("verify", help="Part 7: C + assembly -> MATCH/MISMATCH with structured evidence")
+    v.add_argument("c_source", help="the C file (or .ll) the assembly should correspond to")
+    v.add_argument("assembly", nargs="+", help="assembly file(s) (.s)")
+    v.add_argument("--isa", required=True,
+                   help="architecture of the assembly, or 'auto'. REQUIRED: the target is TO CONFIRM [A1]")
+    v.add_argument("-o", "--out-dir", default=str(config.BUILD_DIR / "verify"),
+                   help="where to write the Markdown report and the JSON evidence")
+    v.add_argument("--level", default="L4", choices=list(_MATCH_LEVELS),
+                   help="how far to take the matcher (default: L4, which also compares branch conditions)")
+    v.add_argument("--require-conditions", action="store_true",
+                   help="treat a branch-condition disagreement as an error, not a warning (the strict "
+                        "reading of [C1])")
+    v.add_argument("--strict", action="store_true",
+                   help="never answer UNSUPPORTED; an unsupported construct becomes MISMATCH [C3]")
+    v.add_argument("--target", help="target triple to compile the C with (default: host; the verified "
+                                    "architecture is TO CONFIRM [A1]/[A7])")
+    v.add_argument("--show-mapping", action="store_true", help="print the block mapping")
+    v.add_argument("-q", "--quiet", action="store_true", help="the table and the verdict only")
+    v.set_defaults(func=_cmd_verify)
     return p
 
 
