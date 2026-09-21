@@ -60,6 +60,7 @@ class Node:
     is_exit: bool = False
     loop_header: bool = False
     loop_depth: int = 0
+    origin_blocks: list[str] = field(default_factory=list)   # raw block labels this node was built from
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -84,6 +85,8 @@ class BranchInfo:
     case_value: str | None = None    # switch: the case constant
     source_line: int | None = None   # C line of the branch (needs -g)
     source_text: str | None = None   # that C line's text, when the C file is available
+    condition_key: str | None = None        # Part 6: the comparable form, e.g. "le.s(var, var)"
+    polarity_free_key: str | None = None    # Part 6, rule N6: equal for a test and its swapped negation
 
 
 @dataclass
@@ -197,12 +200,14 @@ class CFG:
                 problems.append(f"{n.id}: an exit node has successors")
             if n.terminator == "cond_br" and [e.kind for e in outs] != ["T", "F"]:
                 problems.append(f"{n.id}: a 2-way branch must have edges T then F")
-            if self.origin == "hll" and n.operations and n.operations[-1].op not in (
+            if self.origin == "hll" and not self.meta.get("normalized") and n.operations and \
+                    n.operations[-1].op not in (
                     "JUMP", "BRANCH", "SWITCH", "RETURN", "UNREACHABLE", "INDIRECT"):
                 # In assembly a block can end simply because the next instruction is a branch target,
                 # so its last instruction is an ordinary one (a fall-through block).
                 problems.append(f"{n.id}: last operation is not a terminator")
-        if self.node(self.entry).predecessors and self.origin == "hll":
+        if self.node(self.entry).predecessors and self.origin == "hll" and not self.meta.get("normalized"):
+            # After normalization a loop may branch back to the merged entry block, which is legitimate.
             problems.append("the LLVM entry block must not have predecessors")
         return problems
 

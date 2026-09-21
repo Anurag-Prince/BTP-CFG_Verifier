@@ -25,6 +25,14 @@
         "ir_line": {"type": ["integer", "null"]},
         "source_line": {"type": ["integer", "null"]},
         "generator": {"type": "string"},
+        "normalized": {"type": "boolean"},
+        "rules_applied": {"type": "array", "items": {"type": "string"}},
+        "rule_steps": {"type": "integer"},
+        "raw_blocks": {"type": "integer"},
+        "raw_edges": {"type": "integer"},
+        "normalizer": {"type": "string"},
+        "rule_set_status": {"type": "string"},
+        "architecture_status": {"type": "string"},
         "names": {"type": "object", "additionalProperties": {"type": "string"},
                   "description": "canonical name (a0, s1, v7, B3) -> name in the input (%n, %i, %cmp, %if.then)"}
       }
@@ -58,7 +66,8 @@
     "edges": {"type": "array", "items": {"$ref": "#/$defs/edge"}}
   },
   "$defs": {
-    "nodeId": {"type": "string", "pattern": "^B[0-9]+$"},
+    "nodeId": {"type": "string", "pattern": "^(B[0-9]+|EXIT|TRAP)$",
+               "description": "B<index>; EXIT and TRAP are the virtual nodes added by normalization rules N4/N7"},
     "operation": {
       "type": "object",
       "required": ["op", "kind", "result", "operands", "text", "source_line"],
@@ -104,7 +113,9 @@
         "is_entry": {"type": "boolean"},
         "is_exit": {"type": "boolean"},
         "loop_header": {"type": "boolean"},
-        "loop_depth": {"type": "integer", "minimum": 0}
+        "loop_depth": {"type": "integer", "minimum": 0},
+        "origin_blocks": {"type": "array", "items": {"type": "string"},
+                          "description": "Part 6: the raw block labels this normalized node was built from"}
       }
     },
     "edge": {
@@ -133,7 +144,9 @@
                 "ir": {"type": ["string", "null"]},
                 "case_value": {"type": ["string", "null"]},
                 "source_line": {"type": ["integer", "null"]},
-                "source_text": {"type": ["string", "null"]}
+                "source_text": {"type": ["string", "null"]},
+                "condition_key": {"type": ["string", "null"]},
+                "polarity_free_key": {"type": ["string", "null"]}
               }
             }
           ]
