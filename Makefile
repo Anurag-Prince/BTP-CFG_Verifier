@@ -1,7 +1,7 @@
 # Shortcuts. Run inside WSL/Ubuntu from the repo root.
 PY ?= .venv/bin/python
 
-.PHONY: setup env checkpoint regression checkpoint3 checkpoint4 checkpoint5 checkpoint6 checkpoint7 docs test clean
+.PHONY: setup env checkpoint regression checkpoint3 checkpoint4 checkpoint5 checkpoint6 checkpoint7 checkpoint8 verify docs test clean
 
 setup:       ## install system packages + create .venv
 	bash scripts/setup_wsl.sh
@@ -29,6 +29,12 @@ checkpoint6: ## Part 6 checkpoint: raw CFGs -> normalized CFGs, meaning provably
 
 checkpoint7: ## Part 7 checkpoint: C vs assembly -> MATCH/MISMATCH, mutations caught and located
 	bash scripts/checkpoint_part7.sh
+
+checkpoint8: ## Part 8 checkpoint: unseen programs through the same pipeline, implementation unchanged
+	bash scripts/checkpoint_part8.sh
+
+verify:      ## verify one pair: make verify SOURCE=x.c ASM=x.s [ISA=auto]
+	$(PY) main.py --source $(SOURCE) --assembly $(ASM) --isa $(or $(ISA),auto)
 
 docs:        ## redraw expected CFGs and refresh docs/CONTROL_FLOW_FUNDAMENTALS.md
 	$(PY) -m cfgverify expected-cfgs

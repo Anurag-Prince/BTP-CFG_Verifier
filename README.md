@@ -23,6 +23,7 @@ has already produced.
 | **Part 5**: Assembly CFG generator (ISA-neutral reader + ISA plug-ins) | Done. See [`docs/ASM_CFG.md`](docs/ASM_CFG.md) |
 | **Part 6**: CFG normalization (semantic operations, rules N1-N8) | Done. See [`docs/NORMALIZATION.md`](docs/NORMALIZATION.md) |
 | **Part 7**: CFG matching and verification (MATCH/MISMATCH + evidence) | Done. See [`docs/MATCHING.md`](docs/MATCHING.md) |
+| **Part 8**: general input — `main.py`, the pipeline, the explanation layer | Done. See [`docs/GENERAL_INPUT.md`](docs/GENERAL_INPUT.md) |
 | Later parts | Not started. Roadmap in ARCHITECTURE §12 |
 
 > The target assembly architecture is **not yet decided** (TO CONFIRM WITH PROFESSOR). Nothing in this repo assumes
@@ -120,6 +121,16 @@ redirected, a test changed, a function renamed — and requires each break to be
 It also checks the opposite: a harmless edit must still be MATCH. Exit codes: 0 MATCH, 2 MISMATCH,
 3 UNSUPPORTED.
 
+### 11. Run the Part 8 checkpoint — general input
+```bash
+bash scripts/checkpoint_part8.sh                 # 32 unseen programs x 3 architectures
+python main.py --source my_program.c --assembly my_program.s
+```
+It takes the checksums of all 18 implementation files, greps them for the name of every program and function
+in the repo, runs the full pipeline over programs the implementation has never seen on three architectures,
+and requires the checksums to be **identical** afterwards. The ten programs in `regression/c/` are regression
+tests, not the supported input set.
+
 ---
 
 ## Commands
@@ -135,6 +146,7 @@ It also checks the opposite: a harmless edit must still be MATCH. Exit codes: 0 
 | `cfgverify asm-cfg FILE.s... --isa ISA\|auto [-o DIR] [--c-source F.c] [--check]` | Part 5: assembly CFG per function → `DIR/<file>.<isa>.<fn>.cfg.json` + `.svg` + `index.html`. **`--isa` is required** (`auto` detects and prints its decision) |
 | `cfgverify normalize FILE.cfg.json... [-o DIR] [--rules N1,N2,...] [-v] [--check]` | Part 6: normalized CFG + rule log → `DIR/<name>.norm.cfg.json` + `.rules.json` + `.svg`. `--check` proves the meaning survived |
 | `cfgverify verify FILE.c FILE.s... --isa ISA [-o DIR] [--require-conditions] [--strict]` | Part 7: **MATCH / MISMATCH / UNSUPPORTED** with located findings, a Markdown report and a JSON evidence record |
+| `python main.py --source x.c --assembly x.s [--isa ISA] [--explain] [--batch DIR] [--json]` | Part 8: **the general entry point.** The whole pipeline for any supported input pair; exit 0/2/3 |
 | `make test` / `pytest` | All tests: environment, C → IR, Parts 2-7 (about 4 minutes) |
 
 `python -m cfgverify ...` works the same way as `cfgverify ...`.
@@ -144,10 +156,13 @@ It also checks the opposite: a harmless edit must still be MATCH. Exit codes: 0 
 ```
 docs/              ARCHITECTURE.md (Part 0), OPEN_QUESTIONS.md (for the professor), ENVIRONMENT.md (Part 1),
                    CONTROL_FLOW_FUNDAMENTALS.md + cfg/*.svg (Part 2), LLVM_IR_GUIDE.md (Part 3), HLL_CFG.md (Part 4),
-                   ASM_CFG.md (Part 5), NORMALIZATION.md (Part 6), MATCHING.md (Part 7)
+                   ASM_CFG.md (Part 5), NORMALIZATION.md (Part 6), MATCHING.md (Part 7),
+                   GENERAL_INPUT.md (Part 8)
 scripts/           setup_wsl.sh, checkpoint_part1.sh, check_part2.sh, checkpoint_part3.sh, checkpoint_part4.sh,
-                   checkpoint_part5.sh, checkpoint_part6.sh, checkpoint_part7.sh
-examples/c/        hello_cfg.c (smoke-test program), part3/ (Part 3 checkpoint inputs)
+                   checkpoint_part5.sh, checkpoint_part6.sh, checkpoint_part7.sh, checkpoint_part8.sh
+main.py            THE ENTRY POINT: python main.py --source x.c --assembly x.s
+examples/c/        hello_cfg.c (smoke-test program), part3/ (Part 3 checkpoint inputs),
+                   unseen/ (programs written after the implementation was frozen, Part 8)
 regression/        c/*.c regression programs + expected/*.toml expected CFGs (Part 2),
                    asm/*.s hand-written assembly with no compiler directives (Part 5)
 src/cfgverify/     the package; each module's docstring states its responsibility and status
@@ -159,7 +174,8 @@ src/cfgverify/     the package; each module's docstring states its responsibilit
   normalize/       semantic operations, comparable conditions/loops, rules N1-N8, checks (Part 6)
   match/           L0-L4 matcher, localized findings (Part 7)
   report/          the only place a verdict is decided, + Markdown/JSON reports (Part 7)
-  explain/         (stub: Part 8, the AI explanation layer)
+  explain/         deterministic explanation + optional post-checked model (Part 8)
+  pipeline.py      the eight steps, for any input pair (Part 8)
 tests/             pytest suite
 build/             generated output (git-ignored)
 ```

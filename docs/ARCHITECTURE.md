@@ -1,6 +1,6 @@
 # Architecture: C/HLL ↔ Assembly Control-Flow Consistency Verifier
 
-> **Status:** Part 0 design, draft v0.1 (2026-09-20). Parts 1–7 are done; see §12.
+> **Status:** Part 0 design, draft v0.1 (2026-09-20). Parts 1–8 are done; see §12.
 > Anything marked **TO CONFIRM WITH PROFESSOR** is still open. Every open item is collected in
 > [`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md), and this document refers to them by ID (for example **[A1]**).
 > Anything labelled *design choice* is our own engineering decision. It can be changed and is **not** a requirement from the professor.
@@ -294,7 +294,8 @@ btp-cfg-verifier/
     ├── report/
     │   ├── verdict.py        THE ONLY PLACE A VERDICT IS DECIDED (rule R4)         [Part 7]
     │   └── render.py         Terminal summary + Markdown report + JSON evidence    [Part 7]
-    └── explain/explainer.py  AI explanation with guardrails                    [stub]
+    ├── explain/explainer.py  Deterministic template + optional model, post-checked  [Part 8]
+    └── pipeline.py           The eight steps, for ANY input pair                     [Part 8]
 ```
 
 **Ownership rule (design choice):** only `report/verdict.py` may create a `Verdict`. It consumes `match/` output
@@ -552,6 +553,6 @@ defined yet. They are for discussion and are not requirements.
 | 5 | Assembly CFG generator: ISA-neutral reader, ISA plug-in contract, leader algorithm, 3 candidate ISAs ([`ASM_CFG.md`](ASM_CFG.md)) | Done. The ISA to *verify* is still [A1]/[A2] |
 | 6 | CFG normalization: semantic operations, comparable conditions and loops, rules N1-N8 + rule log ([`NORMALIZATION.md`](NORMALIZATION.md)) | Done. The rule set is still a proposal, [C5] |
 | 7 | CFG matching and verification: L0-L4, located findings, verdict, reports ([`MATCHING.md`](MATCHING.md)) | Done. What "consistent" means is still [C1] |
-| *proposal* | Mutation-based evaluation | [F1] |
-| *proposal* | AI explanation with guardrails | [E1] |
+| *proposal* | Mutation-based evaluation at scale | [F1]. Part 7 already mutation-tests every finding kind |
+| 8 | General input: `main.py --source x.c --assembly x.s`, the pipeline, the explanation layer ([`GENERAL_INPUT.md`](GENERAL_INPUT.md)) | Done. The AI provider is still [E1] |
 | *proposal* | More constructs (`&&`/`||`, `?:`, switch, goto, noreturn), L3 anchors, L4 polarity | [B3], [C1] |

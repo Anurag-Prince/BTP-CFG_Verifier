@@ -52,7 +52,7 @@ Suggested order for the first meeting: **A1, A3, A4, C1**. These four decide mos
 
 | ID | Question | Why it matters | Until confirmed | Status |
 |---|---|---|---|---|
-| E1 | Is the AI explanation **required or optional**? Which model or provider (cloud API or a local model)? Any restrictions on sending code to external services? Budget? | Architecture of `explain/`, cost, privacy. | Optional stage with a deterministic template fallback. No provider chosen. | OPEN |
+| E1 | Is the AI explanation **required or optional**? Which model or provider (cloud API or a local model)? Any restrictions on sending code to external services? Budget? | Architecture of `explain/`, cost, privacy. | Part 8 ships a DETERMINISTIC explanation that needs no model at all, plus an optional provider hook whose output is post-checked and discarded if it cites a finding that does not exist or states a different verdict. No provider is configured and none is shipped. | OPEN |
 | E2 | Who is the audience for explanations (students, graders, compiler developers), and how much detail do they need? | Prompt and report design. | General technical audience. | OPEN |
 
 ## F. Evaluation, platform and deliverables
