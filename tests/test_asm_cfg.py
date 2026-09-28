@@ -45,7 +45,7 @@ def compile_asm(c_file: Path, isa: str, *extra: str, compiler: str = "clang", ta
     out = BUILD / (tag or isa) / f"{c_file.stem}.s"
     out.parent.mkdir(parents=True, exist_ok=True)
     cmd = [compiler, "-O0", "-g", "-S", str(c_file), "-o", str(out)]
-    if compiler == "clang":
+    if compiler in ("clang", "gcc"):
         cmd.insert(1, f"--target={ISAS[isa]}")
     cmd[1:1] = list(extra)
     proc = subprocess.run(cmd, capture_output=True, text=True)

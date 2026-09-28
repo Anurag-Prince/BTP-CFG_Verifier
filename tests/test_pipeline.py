@@ -180,13 +180,28 @@ def test_the_architecture_is_detected_and_announced(tmp_path, capsys):
 def test_batch_mode_pairs_by_stem(tmp_path, capsys):
     for c_file in UNSEEN[:3]:
         (tmp_path / c_file.name).write_text(c_file.read_text())
-        subprocess.run(["clang", "-S", "-O0", "-g", "-fno-discard-value-names",
-                        "-o", str(tmp_path / f"{c_file.stem}.s"), str(c_file)], check=True)
-    assert len(find_pairs(tmp_path)) == 3
-    assert entry_point.main(["--batch", str(tmp_path), "--isa", "x86-64",
-                             "-o", str(tmp_path / "out")]) == 0
-    assert "3/3 MATCH" in capsys.readouterr().out
 
+        subprocess.run([
+            "clang",
+            "--target=x86_64-unknown-linux-gnu",
+            "-S",
+            "-O0",
+            "-g",
+            "-fno-discard-value-names",
+            "-o", str(tmp_path / f"{c_file.stem}.s"),
+            str(c_file),
+        ], check=True)
+
+    assert len(find_pairs(tmp_path)) == 3
+
+    assert entry_point.main([
+        "--batch",
+        str(tmp_path),
+        "--isa", "x86-64",
+        "-o", str(tmp_path / "out")
+    ]) == 0
+
+    assert "3/3 MATCH" in capsys.readouterr().out
 
 def test_json_output_is_the_evidence_record(tmp_path, capsys):
     c_file = UNSEEN[3]
